@@ -29,5 +29,18 @@ export const sessionTable = pgTable("session", {
   }).notNull(),
 });
 
+export const plaidAccount = pgTable("plaid_account", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id")
+    .notNull()
+    .references(() => userTable.id),
+  access_token: text("access_token").notNull(),
+  item_id: text("item_id").notNull(),
+  created_at: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  }).notNull(),
+});
+
 export type User = InferSelectModel<typeof userTable>;
 export type Session = InferSelectModel<typeof sessionTable>;
