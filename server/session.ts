@@ -1,12 +1,21 @@
 import { sha256 } from "@oslojs/crypto/sha2";
-import { type User, type Session, db, sessionTable, userTable } from "./db";
+import {
+  type User,
+  type Session,
+  db,
+  sessionTable,
+  userTable,
+  plaidAccount,
+} from "./db";
 import {
   encodeBase32LowerCaseNoPadding,
   encodeHexLowerCase,
 } from "@oslojs/encoding";
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
+import { cache } from "react";
 
-export function generateSessionToken(): string {
+function generateSessionToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return encodeBase32LowerCaseNoPadding(bytes);
@@ -14,10 +23,11 @@ export function generateSessionToken(): string {
 
 const SESSION_EXPIRATION_MILLISECONDS = 1000 * 60 * 60 * 24 * 30;
 
-export async function createSession(
-  token: string,
-  userId: number
-): Promise<Session> {
+/**does everything for session creation. if we need to break this into parts (db persistence, cookie persistence),
+ * can do so later.
+ */
+export async function initializeSession(userId: number) {
+  const token = generateSessionToken();
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const session: Session = {
     id: sessionId,
@@ -25,10 +35,64 @@ export async function createSession(
     expiresAt: new Date(Date.now() + SESSION_EXPIRATION_MILLISECONDS),
   };
   await db.insert(sessionTable).values(session);
-  return session;
+  setSessionTokenCookie(token, session.expiresAt);
 }
 
-export async function validateSessionToken(
+async function setSessionTokenCookie(token: string, expiresAt: Date) {
+  const cookieStore = await cookies();
+  cookieStore.set("session", token, {
+    expires: expiresAt,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+}
+
+/**cached validation to avoid incurring multiple db calls. probably not that necessary */
+export const getCurrentSession = cache(async () => {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("session")?.value ?? null;
+  console.log("checking session", token);
+  if (token === null) {
+    return { session: null, user: null };
+  }
+  return validateSessionToken(token);
+});
+
+/** we throw here since we assume the layout has already checked that the user is logged in */
+export const getUserWithToken = cache(async () => {
+  const sessionUser = await getCurrentSession();
+  if (!sessionUser.user) {
+    throw new Response(null, { status: 404 });
+  }
+  const res = await db
+    .select()
+    .from(plaidAccount)
+    .where(eq(plaidAccount.user_id, sessionUser.user.id));
+  if (res.length === 0) {
+    // i don't think this should ever happen?
+    console.error("no plaid accounts found for user", { sessionUser });
+    throw new Response(null, { status: 404 });
+  }
+  return {
+    user: sessionUser.user,
+    plaidAccount: res[0],
+  };
+});
+
+export async function deleteSessionTokenCookie() {
+  const cookieStore = await cookies();
+  cookieStore.set("session", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
+async function validateSessionToken(
   token: string
 ): Promise<SessionValidationResult> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
