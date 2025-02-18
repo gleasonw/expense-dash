@@ -1,14 +1,11 @@
 import { getCurrentSession } from "@/server/session";
 import { redirect } from "next/navigation";
+import { LocalPostgresProvider } from "@/app/dashboard/LocalPostgresProvider";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getCurrentSession();
-  if (!session.user) {
-    return redirect("/");
-  }
-  return <div>{children}</div>;
+  return <LocalPostgresProvider>{children}</LocalPostgresProvider>;
 }

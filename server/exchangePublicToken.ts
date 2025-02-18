@@ -41,6 +41,15 @@ async function getUser(data: ItemPublicTokenExchangeResponse): Promise<User> {
     return sessionUser.user;
   }
 
+  // user will be keyed to an institution!
+  const test = await plaidClient.identityGet({
+    access_token: data.access_token,
+  });
+
+  console.log(test.data);
+
+  //todo: this doesn't work, existing user will never be found since item_id changes for each plaid auth flow. need to use
+  // identity api and search for the user by email
   const existingUser = await db
     .select()
     .from(plaidAccount)
