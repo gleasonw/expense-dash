@@ -3,8 +3,11 @@
 import { PGlite } from "@electric-sql/pglite";
 import { PGliteProvider } from "@electric-sql/pglite-react";
 import { live } from "@electric-sql/pglite/live";
+import { makeAutoObservable, ObservableMap } from "mobx";
+import { makePersistable } from "mobx-persist-store";
+import React from "react";
 
-const db = await PGlite.create({ extensions: { live } });
+const db = await PGlite.create("idb://expense-dash", { extensions: { live } });
 
 async function initTransactionsTable() {
   console.log("init transactions table");
@@ -46,10 +49,40 @@ initTransactionsTable();
 
 window["db"] = db;
 
+class AppStore {
+  transactionTags = new ObservableMap<
+    string,
+    "expenses" | "income" | "discretionary"
+  >();
+
+  constructor() {
+    makeAutoObservable(this);
+
+    // todo: we should probably move this to the global db at some point, just to handle sync to other accounts/devices
+    makePersistable(this, {
+      name: "AppStore",
+      properties: ["transactionTags"],
+      storage: window.localStorage,
+    });
+  }
+
+  markTransaction(id: string, tag: "expenses" | "income" | "discretionary") {
+    this.transactionTags.set(id, tag);
+  }
+}
+
+const appStore = new AppStore();
+
+export const AppStoreContext = React.createContext<AppStore | null>(null);
+
 export function LocalPostgresProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <PGliteProvider db={db}>{children}</PGliteProvider>;
+  return (
+    <AppStoreContext.Provider value={appStore}>
+      <PGliteProvider db={db}>{children}</PGliteProvider>
+    </AppStoreContext.Provider>
+  );
 }

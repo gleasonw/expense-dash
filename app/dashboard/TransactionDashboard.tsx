@@ -1,8 +1,9 @@
 "use client";
 import { Transaction } from "plaid";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useLiveQuery, usePGlite } from "@electric-sql/pglite-react";
-import { useDebounce } from "@uidotdev/usehooks";
+import { observer } from "mobx-react-lite";
+import { AppStoreContext } from "@/app/dashboard/LocalPostgresProvider";
 
 const useInitTransactions = (transactions: Transaction[]) => {
   const db = usePGlite();
@@ -65,11 +66,29 @@ export function TransactionDashboard({
 
   return (
     <div className="flex flex-col gap-4">
+      <TransactionTags />
       <QueryInput onUpdate={setQuery} />
       <QueryResults rows={items?.rows ?? []} />
     </div>
   );
 }
+
+const TransactionTags = observer(function TransactionTags() {
+  const appStore = useContext(AppStoreContext);
+  if (!appStore) {
+    return null;
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {Array.from(appStore.transactionTags.entries()).map(([id, tag]) => (
+        <div key={id}>
+          {tag}
+          {id}
+        </div>
+      ))}
+    </div>
+  );
+});
 
 function QueryInput({ onUpdate }: { onUpdate: (query: string) => void }) {
   const [query, setQuery] = useState("select * from transactions");
@@ -96,18 +115,98 @@ function QueryInput({ onUpdate }: { onUpdate: (query: string) => void }) {
   );
 }
 
-function QueryResults({ rows }: { rows: { [key: string]: unknown }[] }) {
+const columns = [
+  "date",
+  "name",
+  "amount",
+  "merchant_name",
+  "category",
+] as const satisfies (keyof Transaction)[];
+
+function rendererForColumn(
+  column: (typeof columns)[number],
+  transaction: Transaction
+): string {
+  switch (column) {
+    case "amount":
+      // amount is actually a string here. we need to parse it to a number
+      return Number(transaction.amount).toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+      });
+    case "date":
+      // simple day date
+      return new Date(transaction.date).toLocaleDateString("en-US", {
+        dateStyle: "long",
+      });
+
+    case "category":
+      return transaction.category?.join(", ") || "N/A";
+    default:
+      const value = transaction[column];
+      return value != null ? String(value) : "N/A";
+  }
+}
+
+const QueryResults = observer(function QueryResults({
+  rows,
+}: {
+  rows: { [key: string]: unknown }[];
+}) {
   const firstRow = rows[0];
 
   const resultsAreTransactions = firstRow && "transaction_id" in firstRow;
 
+  const appStore = useContext(AppStoreContext);
+
+  if (!appStore) {
+    return null;
+  }
+
   if (resultsAreTransactions) {
     return (
-      <div className="flex flex-col gap-10">
-        {rows.map((item) => (
-          <DisplayUnknownObject obj={item} key={item.transaction_id} />
-        ))}
-      </div>
+      <table>
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th key={column}>{column}</th>
+            ))}
+            <th>Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((transaction) => (
+            <tr key={transaction.transaction_id}>
+              {columns.map((column) => (
+                <td key={`${transaction.transaction_id}-${column}`}>
+                  {/* Handle different data types and potential null values */}
+                  {rendererForColumn(column, transaction as Transaction)}
+                </td>
+              ))}
+              <td>
+                <select
+                  value={
+                    appStore.transactionTags.get(transaction.transaction_id) ??
+                    "expenses"
+                  }
+                  onChange={(e) => {
+                    appStore.markTransaction(
+                      transaction.transaction_id,
+                      e.target.value as any
+                    );
+                  }}
+                >
+                  <option value=""></option>
+                  <option value="expenses">Expenses</option>
+                  <option value="income">Income</option>
+                  <option value="discretionary">Discretionary</option>
+                  <option value="savings">Savings</option>
+                </select>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     );
   }
 
@@ -121,7 +220,7 @@ function QueryResults({ rows }: { rows: { [key: string]: unknown }[] }) {
       ))}
     </div>
   );
-}
+});
 
 function DisplayUnknownObject({ obj }: { obj: unknown }) {
   return (

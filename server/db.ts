@@ -16,6 +16,8 @@ export const db = drizzle(pool);
 /**we only store user info to seed the client with data, and sync latest data */
 export const userTable = pgTable("user", {
   id: serial("id").primaryKey(),
+  /** this is for the plaid transaction sync endpoint, to fetch new transactions */
+  nextTransactionCursor: text("next_transaction_cursor")
 });
 
 export const sessionTable = pgTable("session", {
