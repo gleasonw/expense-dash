@@ -1,12 +1,5 @@
 import { sha256 } from "@oslojs/crypto/sha2";
-import {
-  type User,
-  type Session,
-  db,
-  sessionTable,
-  userTable,
-  plaidAccount,
-} from "./db";
+import { db } from "./db";
 import {
   encodeBase32LowerCaseNoPadding,
   encodeHexLowerCase,
@@ -14,6 +7,13 @@ import {
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cache } from "react";
+import {
+  sessionTable,
+  plaidAccount,
+  userTable,
+  User,
+  Session,
+} from "@/server/schema";
 
 function generateSessionToken(): string {
   const bytes = new Uint8Array(32);

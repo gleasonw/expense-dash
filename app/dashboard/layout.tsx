@@ -1,11 +1,13 @@
 import { getCurrentSession } from "@/server/session";
 import { redirect } from "next/navigation";
-import { LocalPostgresProvider } from "@/app/dashboard/LocalPostgresProvider";
+import { Providers } from "@/app/dashboard/Providers";
+import { db } from "@/server/db";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <LocalPostgresProvider>{children}</LocalPostgresProvider>;
+  const tags = await db.query.tags.findMany();
+  return <Providers tags={tags}>{children}</Providers>;
 }
