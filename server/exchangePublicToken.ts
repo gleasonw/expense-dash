@@ -1,6 +1,7 @@
 "use server";
-import { plaidClient } from "@/plaid";
-import { db, plaidAccount, User, userTable } from "@/server/db";
+import { plaidClient } from "@/server/plaid";
+import { db } from "@/server/db";
+import { plaidAccount, User, userTable } from "@/server/schema";
 import { initializeSession, getCurrentSession } from "@/server/session";
 import { eq } from "drizzle-orm";
 import { ItemPublicTokenExchangeResponse } from "plaid";

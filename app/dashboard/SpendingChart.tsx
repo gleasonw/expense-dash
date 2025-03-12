@@ -8,7 +8,7 @@ type SpendingChartProps = {
   discretionaryByMonth: Array<{
     month: string;
     tag: string;
-    total_discretionary_spending: string;
+    amount: string;
   }>;
 };
 
@@ -18,7 +18,7 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
     const groupedData = discretionaryByMonth.reduce((acc, row) => {
       const month = row.month.substring(0, 7); // Extract year-month
       const tag = row.tag;
-      const spending = parseFloat(row.total_discretionary_spending);
+      const spending = parseFloat(row.amount);
 
       if (!acc[tag]) {
         acc[tag] = [];
