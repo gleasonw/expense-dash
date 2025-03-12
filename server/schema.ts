@@ -1,4 +1,11 @@
-import { decimal, varchar, date, jsonb, boolean } from "drizzle-orm/pg-core";
+import {
+  decimal,
+  varchar,
+  date,
+  jsonb,
+  boolean,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { relations, type InferSelectModel } from "drizzle-orm";
 import { Transaction } from "plaid";
@@ -40,6 +47,19 @@ export const transactions = pgTable("transactions", {
   user_id: integer("user_id").references(() => userTable.id),
 });
 
+export const auto_tag_merchants = pgTable("auto_tag_merchants", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  merchant_name: varchar("merchant_name", { length: 255 }),
+  tag: varchar("tag", { length: 255 })
+    .references(() => tags.tag)
+    .notNull(),
+  user_id: integer("user_id").references(() => userTable.id),
+  transaction_id: text("transaction_id").references(
+    () => transactions.transaction_id
+  ),
+});
+
 export type TransactionWithTags = InferSelectModel<typeof transactions> & {
   tagsLinks: InferSelectModel<typeof tagsLink> &
     { tag: Tag; transaction: Transaction }[];
@@ -59,10 +79,14 @@ export const tagsRelations = relations(tags, ({ many }) => ({
   tagsLinks: many(tagsLink),
 }));
 
-export const tagsLink = pgTable("tags_link", {
-  transaction_id: text("transaction_id").notNull(),
-  tag: varchar("tag").notNull(),
-});
+export const tagsLink = pgTable(
+  "tags_link",
+  {
+    transaction_id: text("transaction_id").notNull(),
+    tag: varchar("tag").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.transaction_id, table.tag] })]
+);
 
 export const tagsLinkRelations = relations(tagsLink, ({ one }) => ({
   transaction: one(transactions, {
@@ -77,9 +101,15 @@ export const tagsLinkRelations = relations(tagsLink, ({ one }) => ({
 
 export const userTable = pgTable("user", {
   id: serial("id").primaryKey(),
+  googleId: text("google_id").notNull(),
+  name: text("name").notNull(),
   /** this is for the plaid transaction sync endpoint, to fetch new transactions */
   nextTransactionCursor: text("next_transaction_cursor"),
 });
+
+export const userRelations = relations(userTable, ({ many }) => ({
+  plaidAccounts: many(plaidAccount),
+}));
 
 export const sessionTable = pgTable("session", {
   id: text("id").primaryKey(),
@@ -104,6 +134,13 @@ export const plaidAccount = pgTable("plaid_account", {
     mode: "date",
   }).notNull(),
 });
+
+export const plaidAccountRelations = relations(plaidAccount, ({ one }) => ({
+  user: one(userTable, {
+    fields: [plaidAccount.user_id],
+    references: [userTable.id],
+  }),
+}));
 
 export type User = InferSelectModel<typeof userTable>;
 export type Session = InferSelectModel<typeof sessionTable>;

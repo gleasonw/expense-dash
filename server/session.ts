@@ -47,13 +47,13 @@ async function setSessionTokenCookie(token: string, expiresAt: Date) {
     sameSite: "lax",
     path: "/",
   });
+  console.log("set session token", { token, expiresAt, cookieStore });
 }
 
 /**cached validation to avoid incurring multiple db calls. probably not that necessary */
 export const getCurrentSession = cache(async () => {
   const cookieStore = await cookies();
   const token = cookieStore.get("session")?.value ?? null;
-  console.log("checking session", token);
   if (token === null) {
     return { session: null, user: null };
   }
@@ -63,8 +63,9 @@ export const getCurrentSession = cache(async () => {
 /** we throw here since we assume the layout has already checked that the user is logged in */
 export const getUserWithToken = cache(async () => {
   const sessionUser = await getCurrentSession();
+  console.log({ sessionUser });
   if (!sessionUser.user) {
-    throw new Response(null, { status: 404 });
+    throw new Response(`user has no session`, { status: 404 });
   }
   const res = await db
     .select()
@@ -73,11 +74,11 @@ export const getUserWithToken = cache(async () => {
   if (res.length === 0) {
     // i don't think this should ever happen?
     console.error("no plaid accounts found for user", { sessionUser });
-    throw new Response(null, { status: 404 });
+    return "no-plaid-account";
   }
   return {
     user: sessionUser.user,
-    plaidAccount: res[0],
+    plaidAccount: res[0]!,
   };
 });
 
@@ -96,14 +97,17 @@ async function validateSessionToken(
   token: string
 ): Promise<SessionValidationResult> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
+  console.log({ sessionId });
   const result = await db
     .select({ user: userTable, session: sessionTable })
     .from(sessionTable)
     .innerJoin(userTable, eq(sessionTable.userId, userTable.id))
     .where(eq(sessionTable.id, sessionId));
+
   if (result.length < 1) {
     return { session: null, user: null };
   }
+
   const { session, user } = result[0];
   if (Date.now() >= session.expiresAt.getTime()) {
     await invalidateSession(sessionId);

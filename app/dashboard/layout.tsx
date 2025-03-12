@@ -1,5 +1,3 @@
-import { getCurrentSession } from "@/server/session";
-import { redirect } from "next/navigation";
 import { Providers } from "@/app/dashboard/Providers";
 import { db } from "@/server/db";
 

@@ -1,6 +1,6 @@
 "use client";
 import { Transaction } from "plaid";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { AppStoreContext, TagsContext } from "@/app/dashboard/Providers";
 import { TransactionWithTags } from "@/server/schema";
@@ -12,7 +12,6 @@ const columns = [
   "name",
   "amount",
   "merchant_name",
-  "category",
 ] as const satisfies (keyof Transaction)[];
 
 function rendererForColumn(
@@ -32,8 +31,6 @@ function rendererForColumn(
         dateStyle: "long",
       });
 
-    case "category":
-      return transaction.category?.join(", ") || "N/A";
     default:
       const value = transaction[column];
       return value != null ? String(value) : "N/A";
@@ -85,6 +82,11 @@ export const SpendingTable = observer(function QueryResults({
   // just render key: val
   return (
     <div className="flex flex-col">
+      <span className="text-red-500">
+        {" "}
+        TODO: add in direct sql queries, option to save /name views, default
+        view, etc
+      </span>
       {rows.map((item) => (
         <div className="flex flex-col">
           <DisplayUnknownObject obj={item} />
@@ -119,21 +121,36 @@ export function TransactionCategorizer({
   transaction: Transaction & { tagsLinks?: { tag: { tag: string } }[] };
 }) {
   const tags = useContext(TagsContext);
+  const [autoTagTransaction, setAutoTagTransaction] = useState(false);
 
   return (
-    <select
-      value={transaction.tagsLinks?.at(0)?.tag.tag ?? ""}
-      onChange={(e) => {
-        addTagToTransaction(transaction.transaction_id, e.target.value as any);
-      }}
-    >
-      {tags?.map((t) => (
-        <option key={t.tag} value={t.tag}>
-          {t.tag}
-        </option>
-      ))}
-      <option value="">None</option>
-    </select>
+    <div className="flex gap-2">
+      <select
+        value={transaction.tagsLinks?.at(0)?.tag.tag ?? ""}
+        onChange={(e) => {
+          addTagToTransaction({
+            tag: e.target.value,
+            transaction,
+            autoTag: autoTagTransaction,
+          });
+        }}
+      >
+        {tags?.map((t) => (
+          <option key={t.tag} value={t.tag}>
+            {t.tag}
+          </option>
+        ))}
+        <option value="">None</option>
+      </select>
+      <label>
+        Autotag
+        <input
+          type="checkbox"
+          checked={autoTagTransaction}
+          onChange={(e) => setAutoTagTransaction(e.target.checked)}
+        />
+      </label>
+    </div>
   );
 }
 

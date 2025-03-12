@@ -1,5 +1,12 @@
 import { db } from "@/server/db";
-import { tags, tagsLink, userTable } from "@/server/schema";
+import {
+  auto_tag_merchants,
+  tags,
+  tagsLink,
+  transactions,
+  userTable,
+} from "@/server/schema";
+import { eq, or } from "drizzle-orm";
 
 export async function seedTags() {
   await db
@@ -34,5 +41,24 @@ export async function giveAllDefaultDiscretionaryTag() {
   );
 }
 
-await seedTags();
+export async function applyAutoTagsToPendingTransactions(userId: number) {
+  const tagLinksToAdd = await db
+    .select()
+    .from(transactions)
+    .innerJoin(
+      auto_tag_merchants,
+      or(
+        eq(transactions.name, auto_tag_merchants.name),
+        eq(transactions.merchant_name, auto_tag_merchants.merchant_name)
+      )
+    );
+  await db.insert(tagsLink).values(
+    tagLinksToAdd.map((t) => ({
+      transaction_id: t.transactions.transaction_id,
+      tag: t.auto_tag_merchants.tag,
+    }))
+  );
+}
+
+await applyAutoTagsToPendingTransactions(2);
 process.exit(0);

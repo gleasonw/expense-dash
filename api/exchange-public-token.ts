@@ -1,4 +1,4 @@
-import { plaidClient } from "@/plaid";
+import { plaidClient } from "@/server/plaid";
 import { withIronSessionApiRoute } from "iron-session/next";
 
 // todo start session using the lucia guidelines
