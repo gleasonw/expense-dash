@@ -1,8 +1,7 @@
-import { addTransactions } from "@/app/dashboard/actions";
+import { addTransactions, setTagAllocation } from "@/app/dashboard/actions";
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { SpendingTable } from "@/app/dashboard/SpendingTable";
-import { SpendingTargets } from "@/app/dashboard/SpendingTargets";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
 import {
@@ -10,14 +9,15 @@ import {
   transactions,
   auto_tag_merchants,
   tagsLink,
+  tags,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { desc, eq, sql, and, inArray } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
+import { Label } from "@/app/components/Label";
 
 export default async function Dashboard() {
-  console.log("rendering page");
   const userWithAccount = await getUserWithToken();
   if (userWithAccount === "no-plaid-account") {
     return redirect("/link");
@@ -115,31 +115,111 @@ export default async function Dashboard() {
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col">
+    <div className="flex flex-col gap-4 items-center">
+      <div className="border shadow-lg w-full p-3 flex items-center justify-center flex-wrap">
         <SpendingCategorizer
           transactionsWithoutTag={ts.filter((t) => t.tagsLinks.length === 0)}
         />
-        <div className="flex gap-3 flex-wrap">
-          <div className="flex flex-col gap-10 max-w-[800px] mx-auto">
-            <Income discretionaryByMonth={discretionarySpendingByMonth.rows} />
-            <SpendingChart
-              discretionaryByMonth={discretionarySpendingByMonth.rows}
-            />
-          </div>
-          <div className="max-w-[800px]">
-            <SpendingTable rows={ts} />
-          </div>
+      </div>
+      <div className="flex flex-col gap-5 p-3 w-[900px]">
+        <TargetForTagPicker />
+        <div className="bg-gray-100 rounded-lg pg-3">
+          <div>Todo: picker for monthly/quarterly</div>
+          <Income taggedSpendingByPeriod={discretionarySpendingByMonth.rows} />
+          <NetSpending />
         </div>
+        <SpendingChart
+          discretionaryByMonth={discretionarySpendingByMonth.rows}
+        />
+      </div>
+      <div className="max-w-[800px]">
+        <SpendingTable rows={ts} />
       </div>
     </div>
   );
 }
 
+async function NetSpending() {
+  const user = await getUserWithToken();
+  const incomeQuery = (await db.execute(
+    sql`
+    SELECT
+      DATE_TRUNC('month', t.date) AS month,
+      SUM(CAST(t.amount AS NUMERIC)) AS amount,
+      tl.tag
+    FROM
+        transactions t
+    JOIN
+        tags_link tl ON t.transaction_id = tl.transaction_id
+    WHERE
+        t.user_id = ${user.user.id}
+        AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+        AND tl.tag = 'income'
+    GROUP BY
+        DATE_TRUNC('month', t.date), tl.tag
+    ORDER BY
+        month;
+`
+  )) as { rows: { month: string; amount: string; tag: string }[] };
+  const income = parseInt(incomeQuery.rows?.[0]?.amount ?? "", 10);
+  const spendingQuery = await db.execute(
+    sql`
+SELECT
+  DATE_TRUNC('month', t.date) AS month,
+  SUM(CAST(t.amount AS NUMERIC)) AS amount
+FROM transactions t
+WHERE t.user_id = 1
+  AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
+  AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+GROUP BY DATE_TRUNC('month', t.date);
+
+    `
+  );
+  return <div>Net spending</div>;
+}
+
+async function TargetForTagPicker() {
+  const allTags = await db.query.tags.findMany({ with: { allocation: true } });
+  const tags = allTags.filter(
+    (t) => t.tag !== "income" && t.tag !== "transfer"
+  );
+  return (
+    <div className="flex flex-col gap-3">
+      <div>income allocation targets</div>
+      <form className="flex gap-3 flex-wrap" action={setTagAllocation}>
+        {tags.map((t) => (
+          <Label text={t.tag} key={t.tag}>
+            <div className="flex gap-2">
+              <input
+                name={t.tag}
+                type="number"
+                className="w-14 inset-4 border"
+                defaultValue={t.allocation?.allocation ?? ""}
+              />
+              <span>%</span>
+            </div>
+          </Label>
+        ))}
+        <button type="submit">Save</button>
+      </form>
+    </div>
+  );
+}
+
+const toTrack = ["discretionary", "savings", "giving"] as const;
+
+const labelForKind: Record<TargetKind, string> = {
+  discretionary: "Discretionary",
+  giving: "Giving",
+  savings: "Savings",
+};
+
+type TargetKind = (typeof toTrack)[number];
+
 async function Income({
-  discretionaryByMonth,
+  taggedSpendingByPeriod,
 }: {
-  discretionaryByMonth: {
+  taggedSpendingByPeriod: {
     month: string;
     amount: string;
     tag: string;
@@ -147,6 +227,18 @@ async function Income({
   }[];
 }) {
   const user = await getUserWithToken();
+  // todo: dedupe
+  const allTags = await db.query.tags.findMany({ with: { allocation: true } });
+  const tagsTracked = allTags.filter((t) => toTrack.includes(t.tag));
+  console.log(tagsTracked);
+  const targets = tagsTracked.reduce((acc, t) => {
+    if (isNaN(parseInt(t.allocation.allocation))) {
+      return acc;
+    }
+    acc[t.tag as TargetKind] = parseInt(t.allocation.allocation, 10);
+    return acc;
+  }, {} as Record<TargetKind, number>);
+
   const estimatedIncomeAndExpenses = (await db.execute(
     sql`
     SELECT
@@ -168,16 +260,83 @@ async function Income({
 `
   )) as { rows: { month: string; amount: string; tag: string }[] };
 
-  const currentMonthSpending = discretionaryByMonth.filter(
+  const currentPeriodSpending = taggedSpendingByPeriod.filter(
     (t) => t.is_current_month
   );
 
+  const { income, expenses } = R.groupBy(
+    estimatedIncomeAndExpenses.rows,
+    (r) => r.tag
+  );
+
+  const currentPeriodSpendingByTag = R.indexBy(
+    currentPeriodSpending,
+    (s) => s.tag
+  );
+
+  const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
+  const estExpenses = parseInt(expenses?.[0].amount ?? "0", 10);
+  const trackedSpendingByKind = R.pick(currentPeriodSpendingByTag, toTrack);
+  const trackedSpending = Object.values(trackedSpendingByKind).reduce(
+    (acc, v) => {
+      const currentSpending = parseInt(v.amount ?? "0");
+      if (isNaN(currentSpending)) {
+        return acc;
+      }
+      return acc + currentSpending;
+    },
+    0
+  );
+  const unspent = estIncome - estExpenses - trackedSpending;
+
   return (
-    <div className="text-2xl p-5">
-      <SpendingTargets
-        estimatedIncomeAndExpenses={estimatedIncomeAndExpenses.rows}
-        currentMonthSpending={currentMonthSpending}
-      />
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
+        <div className="flex gap-10 w-full">
+          <Label text="Income">
+            <span>${estIncome}</span>
+          </Label>
+          <Label text="Expenses">-${estExpenses}</Label>
+          <Label text="To allocate">
+            <span>${estIncome - estExpenses}</span>
+          </Label>
+        </div>
+        <div className="flex gap-5">
+          <div className="flex gap-10 flex-wrap">
+            {toTrack.map((kind) => {
+              const targetSpending = (targets[kind] / 100) * estIncome;
+              const currentSpending = parseInt(
+                currentPeriodSpendingByTag[kind]?.amount ?? "0"
+              );
+              return (
+                <div
+                  className="flex border shadow-lg p-3 gap-5 flex-col bg-white"
+                  key={kind}
+                >
+                  <Label text={labelForKind[kind]} className="text-lg">
+                    (${Math.round(targetSpending)}) -
+                    {isNaN(currentSpending) ? "$0" : `$${currentSpending}`}
+                  </Label>
+                  <Label text="To spend" className="text-3xl">
+                    {isNaN(currentSpending) ? (
+                      <span className="text-right">
+                        ${targetSpending.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-right">
+                        ${Math.round(targetSpending - currentSpending)}
+                      </span>
+                    )}
+                  </Label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <Label text={"Unspent"}>
+          <span className=" ">${Math.round(unspent)}</span>
+        </Label>
+      </div>
     </div>
   );
 }

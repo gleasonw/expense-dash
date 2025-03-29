@@ -71,12 +71,20 @@ export const transactionsRelations = relations(transactions, ({ many }) => ({
 
 export const tags = pgTable("tags", {
   tag: varchar("tag", { length: 255 }).primaryKey(),
+  //TODO: make tags specific to users
+  // label: varchar("label", { length: 255 }).notNull(),
+  // color: varchar("color", { length: 255 }).notNull(),
+  // userId: integer("user_id").references(() => userTable.id),
 });
 
 export type Tag = InferSelectModel<typeof tags>;
 
-export const tagsRelations = relations(tags, ({ many }) => ({
+export const tagsRelations = relations(tags, ({ many, one }) => ({
   tagsLinks: many(tagsLink),
+  allocation: one(tagAllocations, {
+    fields: [tags.tag],
+    references: [tagAllocations.tag],
+  }),
 }));
 
 export const tagsLink = pgTable(
@@ -95,6 +103,27 @@ export const tagsLinkRelations = relations(tagsLink, ({ one }) => ({
   }),
   tag: one(tags, {
     fields: [tagsLink.tag],
+    references: [tags.tag],
+  }),
+}));
+
+export const tagAllocations = pgTable(
+  "tag_allocations",
+  {
+    user_id: integer("user_id")
+      .notNull()
+      .references(() => userTable.id),
+    tag: varchar("tag", { length: 255 })
+      .notNull()
+      .references(() => tags.tag),
+    allocation: decimal("allocation").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.user_id, table.tag] })]
+);
+
+export const tagAllocationsRelations = relations(tagAllocations, ({ one }) => ({
+  tag: one(tags, {
+    fields: [tagAllocations.tag],
     references: [tags.tag],
   }),
 }));

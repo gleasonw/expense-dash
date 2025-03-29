@@ -5,13 +5,45 @@ import { db } from "@/server/db";
 import { getUserWithToken } from "@/server/session";
 import {
   auto_tag_merchants,
+  tagAllocations,
   tagsLink,
   transactions,
   User,
 } from "@/server/schema";
 import { Transaction } from "plaid";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+
+export async function setTagAllocation(formData: FormData) {
+  "use server";
+  const allocations = Array.from(formData.entries())
+    .map(([tag, allocation]) => ({
+      tag,
+      allocation,
+    }))
+    .filter((a) => !isNaN(parseFloat(a.allocation as string)));
+  console.log({ allocations });
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return;
+  }
+  console.log({ user, allocations });
+
+  await db
+    .insert(tagAllocations)
+    .values(
+      allocations.map((a) => ({
+        tag: a.tag,
+        allocation: a.allocation as string,
+        user_id: user.user.id,
+      }))
+    )
+    .onConflictDoUpdate({
+      target: [tagAllocations.user_id, tagAllocations.tag],
+      set: { allocation: sql`excluded.allocation` },
+    });
+  revalidatePath("/dashboard");
+}
 
 export async function addTransactions(
   ts: (Transaction & { amount: string })[]
