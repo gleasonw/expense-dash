@@ -10,6 +10,7 @@ import {
   auto_tag_merchants,
   tagsLink,
   tags,
+  tagAllocations,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { desc, eq, sql, and, inArray } from "drizzle-orm";
@@ -100,7 +101,7 @@ export default async function Dashboard() {
           tags_link tl ON t.transaction_id = tl.transaction_id
       WHERE
           t.user_id = ${userWithAccount.user.id}
-          AND tl.tag not in ('income', 'transfer', 'expenses')
+          AND tl.tag not in ('income', 'transfer')
       GROUP BY
           DATE_TRUNC('month', t.date), tl.tag
       ORDER BY
@@ -114,33 +115,6 @@ export default async function Dashboard() {
     orderBy: [desc(transactions.date)],
   });
 
-  return (
-    <div className="flex flex-col gap-4 items-center">
-      <div className="border shadow-lg w-full p-3 flex items-center justify-center flex-wrap">
-        <SpendingCategorizer
-          transactionsWithoutTag={ts.filter((t) => t.tagsLinks.length === 0)}
-        />
-      </div>
-      <div className="flex flex-col gap-5 p-3 w-[900px]">
-        <TargetForTagPicker />
-        <div className="bg-gray-100 rounded-lg pg-3">
-          <div>Todo: picker for monthly/quarterly</div>
-          <Income taggedSpendingByPeriod={discretionarySpendingByMonth.rows} />
-          <NetSpending />
-        </div>
-        <SpendingChart
-          discretionaryByMonth={discretionarySpendingByMonth.rows}
-        />
-      </div>
-      <div className="max-w-[800px]">
-        <SpendingTable rows={ts} />
-      </div>
-    </div>
-  );
-}
-
-async function NetSpending() {
-  const user = await getUserWithToken();
   const incomeQuery = (await db.execute(
     sql`
     SELECT
@@ -152,7 +126,7 @@ async function NetSpending() {
     JOIN
         tags_link tl ON t.transaction_id = tl.transaction_id
     WHERE
-        t.user_id = ${user.user.id}
+        t.user_id = ${userWithAccount.user.id}
         AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
         AND tl.tag = 'income'
     GROUP BY
@@ -161,21 +135,114 @@ async function NetSpending() {
         month;
 `
   )) as { rows: { month: string; amount: string; tag: string }[] };
-  const income = parseInt(incomeQuery.rows?.[0]?.amount ?? "", 10);
+  const estIncomeForPeriod = Math.round(
+    parseInt(incomeQuery.rows?.[0]?.amount ?? "", 10) * -1
+  );
+
+  return (
+    <div className="flex flex-col gap-4 items-center">
+      <div className="border shadow-lg w-full p-3 flex items-center justify-center flex-wrap">
+        <SpendingCategorizer
+          transactionsWithoutTag={ts.filter((t) => t.tagsLinks.length === 0)}
+        />
+      </div>
+      <div className="flex w-full flex-wrap justify-center gap-10">
+        <div className="flex flex-col gap-10 p-3 w-[900px]">
+          <TargetForTagPicker />
+          <div className="bg-gray-100 rounded-lg pg-3">
+            <div>Todo: picker for monthly/quarterly</div>
+            <Income
+              taggedSpendingByPeriod={discretionarySpendingByMonth.rows}
+            />
+            <NetSpending estimatedIncomeForPeriod={estIncomeForPeriod} />
+            <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
+          </div>
+          <SpendingChart
+            discretionaryByMonth={discretionarySpendingByMonth.rows}
+          />
+        </div>
+        <div className="max-w-[800px]">
+          <SpendingTable rows={ts} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function NetSpending({
+  estimatedIncomeForPeriod,
+}: {
+  estimatedIncomeForPeriod: number;
+}) {
+  const user = await getUserWithToken();
+
   const spendingQuery = await db.execute(
     sql`
-SELECT
-  DATE_TRUNC('month', t.date) AS month,
-  SUM(CAST(t.amount AS NUMERIC)) AS amount
-FROM transactions t
-WHERE t.user_id = 1
-  AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
-  AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-GROUP BY DATE_TRUNC('month', t.date);
-
+    SELECT
+      DATE_TRUNC('month', t.date) AS month,
+      SUM(CAST(t.amount AS NUMERIC)) AS amount
+    FROM
+      transactions t
+      JOIN tags_link tl ON t.transaction_id = tl.transaction_id
+    WHERE
+      t.user_id = ${user.user.id}
+      AND tl.tag IN ('expenses', 'savings', 'discretionary', 'giving')
+      AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
+      AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+    GROUP BY
+      DATE_TRUNC('month', t.date);
     `
   );
-  return <div>Net spending</div>;
+  const spendingForMonth = spendingQuery.rows?.[0]?.amount;
+  const spendingForMonthInt = parseInt(spendingForMonth ?? "", 10);
+  return (
+    <div>
+      Actual net spending (non estimated expenses): {spendingForMonthInt}; total
+      remaining: {estimatedIncomeForPeriod - spendingForMonthInt}
+    </div>
+  );
+}
+
+async function Expenses({
+  estimatedIncomeForPeriod,
+}: {
+  estimatedIncomeForPeriod: number;
+}) {
+  const user = await getUserWithToken();
+  const expenseQuery = await db.execute(
+    sql`
+    SELECT
+      DATE_TRUNC('month', t.date) AS month,
+      SUM(CAST(t.amount AS NUMERIC)) AS amount
+    FROM
+      transactions t
+      JOIN tags_link tl ON t.transaction_id = tl.transaction_id
+    WHERE
+      t.user_id = ${user.user.id}
+      AND tl.tag IN ('expenses')
+      AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
+      AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+    GROUP BY
+      DATE_TRUNC('month', t.date);
+    `
+  );
+  const expensesForPeriod = parseInt(expenseQuery.rows?.[0]?.amount ?? "", 10);
+  const expenseAllocation = await db.query.tagAllocations.findFirst({
+    where: eq(tagAllocations.tag, "expenses"),
+    with: { tag: true },
+  });
+  if (!expenseAllocation) {
+    return <div>No allocation</div>;
+  }
+  const targetSpending = Math.round(
+    estimatedIncomeForPeriod * (parseInt(expenseAllocation.allocation) / 100)
+  );
+  return (
+    <div>
+      target: {targetSpending}, actual: {expensesForPeriod}, diff:{" "}
+      {targetSpending - expensesForPeriod}
+    </div>
+  );
 }
 
 async function TargetForTagPicker() {
@@ -183,10 +250,15 @@ async function TargetForTagPicker() {
   const tags = allTags.filter(
     (t) => t.tag !== "income" && t.tag !== "transfer"
   );
+  const sumAllocations = tags.reduce((acc, t) => {
+    return acc + parseInt(t.allocation?.allocation ?? "0", 10);
+  }, 0);
   return (
     <div className="flex flex-col gap-3">
-      <div>income allocation targets</div>
-      <form className="flex gap-3 flex-wrap" action={setTagAllocation}>
+      <form
+        className="flex items-center gap-3 flex-wrap"
+        action={setTagAllocation}
+      >
         {tags.map((t) => (
           <Label text={t.tag} key={t.tag}>
             <div className="flex gap-2">
@@ -200,7 +272,10 @@ async function TargetForTagPicker() {
             </div>
           </Label>
         ))}
-        <button type="submit">Save</button>
+        <div>used: {sumAllocations}%</div>
+        <button className="p-2 border hover:bg-gray-200" type="submit">
+          Save
+        </button>
       </form>
     </div>
   );
