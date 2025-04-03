@@ -5,14 +5,17 @@ import { db } from "@/server/db";
 import { getUserWithToken } from "@/server/session";
 import {
   auto_tag_merchants,
+  auto_tag_merchants_new,
   tagAllocations,
+  tags_new,
   tagsLink,
+  tagsLinkNew,
   transactions,
   User,
 } from "@/server/schema";
-import { Transaction } from "plaid";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import { Transaction } from "plaid";
 
 export async function setTagAllocation(formData: FormData) {
   "use server";
@@ -95,6 +98,55 @@ export async function addTagToTransaction({
         transaction_id: transactionId,
       });
     }
+  }
+  revalidatePath("/dashboard");
+}
+
+export async function addTagToTransaction_v2({
+  transactionId,
+  tagId,
+  autoTag,
+}: {
+  transactionId: string;
+  tagId: string;
+  autoTag: boolean;
+}) {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    // gotta figure out a way to do middleware or something and pass user as context, like trpc
+    throw new Error("no plaid account");
+  }
+  const [fullTag, fullTransaction] = await Promise.all([
+    db.query.tags_new.findFirst({
+      where: and(eq(tags_new.userId, user.user.id), eq(tags_new.id, tagId)),
+    }),
+    db.query.transactions.findFirst({
+      where: and(
+        eq(transactions.user_id, user.user.id),
+        eq(transactions.transaction_id, transactionId)
+      ),
+    }),
+  ]);
+
+  if (!fullTag) {
+    throw new Error("tag not found");
+  }
+  if (!fullTransaction) {
+    throw new Error("transaction not found");
+  }
+
+  console.log("adding tag", fullTag, "to transaction", fullTransaction);
+  await db
+    .insert(tagsLinkNew)
+    .values({ transaction_id: transactionId, tag_id: tagId });
+  if (autoTag) {
+    await db.insert(auto_tag_merchants_new).values({
+      name: fullTransaction.name,
+      merchant_name: fullTransaction.merchant_name,
+      tag_id: fullTag.id,
+      user_id: user.user.id,
+      transaction_id: transactionId,
+    });
   }
   revalidatePath("/dashboard");
 }
