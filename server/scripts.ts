@@ -5,21 +5,42 @@ import {
   tagsLink,
   transactions,
   userTable,
+  tags_new,
+  tagsLinkNew,
 } from "@/server/schema";
 import { eq, or } from "drizzle-orm";
 
 export async function seedTags() {
-  await db
-    .insert(tags)
-    .values([
-      { tag: "expenses" },
-      { tag: "income" },
-      { tag: "discretionary" },
-      { tag: "savings" },
-      { tag: "giving" },
-      { tag: "transfer" },
-    ])
-    .onConflictDoNothing();
+  await db.insert(tags_new).values([
+    { tag: "expenses", userId: 2, label: "Expenses", color: "#FF0000" },
+    { tag: "income", userId: 2, label: "Income", color: "#00FF00" },
+    {
+      tag: "discretionary",
+      userId: 2,
+      label: "Discretionary",
+      color: "#0000FF",
+    },
+    { tag: "savings", userId: 2, label: "Savings", color: "#FFFF00" },
+    { tag: "giving", userId: 2, label: "Giving", color: "#FF00FF" },
+    { tag: "transfer", userId: 2, label: "Transfer", color: "#00FFFF" },
+  ]);
+  const taggedTransactions = await db
+    .select()
+    .from(tagsLink)
+    .leftJoin(tags_new, eq(tagsLink.tag, tags_new.tag));
+  const transactionsToSeed = taggedTransactions.filter(
+    (t) => t.tags_v2 !== null
+  );
+  const res = await db
+    .insert(tagsLinkNew)
+    .values(
+      transactionsToSeed.map((t) => ({
+        transaction_id: t.tags_link.transaction_id,
+        tag_id: t.tags_v2!.id,
+      }))
+    )
+    .returning();
+  console.log(`seeded ${res.length} values`);
 }
 
 export async function clearCursor() {
@@ -60,5 +81,5 @@ export async function applyAutoTagsToPendingTransactions(userId: number) {
   );
 }
 
-await applyAutoTagsToPendingTransactions(2);
+await seedTags();
 process.exit(0);

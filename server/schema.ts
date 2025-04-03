@@ -5,6 +5,7 @@ import {
   jsonb,
   boolean,
   primaryKey,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { relations, type InferSelectModel } from "drizzle-orm";
@@ -60,6 +61,19 @@ export const auto_tag_merchants = pgTable("auto_tag_merchants", {
   ),
 });
 
+export const auto_tag_merchants_new = pgTable("auto_tag_merchants_new", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  merchant_name: varchar("merchant_name", { length: 255 }),
+  tag_id: varchar("tag_id", { length: 255 })
+    .references(() => tags_new.id)
+    .notNull(),
+  user_id: integer("user_id").references(() => userTable.id),
+  transaction_id: text("transaction_id").references(
+    () => transactions.transaction_id
+  ),
+});
+
 export type TransactionWithTags = InferSelectModel<typeof transactions> & {
   tagsLinks: InferSelectModel<typeof tagsLink> &
     { tag: Tag; transaction: Transaction }[];
@@ -71,10 +85,16 @@ export const transactionsRelations = relations(transactions, ({ many }) => ({
 
 export const tags = pgTable("tags", {
   tag: varchar("tag", { length: 255 }).primaryKey(),
-  //TODO: make tags specific to users
-  // label: varchar("label", { length: 255 }).notNull(),
-  // color: varchar("color", { length: 255 }).notNull(),
-  // userId: integer("user_id").references(() => userTable.id),
+});
+
+export const tags_new = pgTable("tags_v2", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tag: varchar("tag", { length: 255 }).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  color: varchar("color", { length: 255 }).notNull(),
+  userId: integer("user_id")
+    .references(() => userTable.id)
+    .notNull(),
 });
 
 export type Tag = InferSelectModel<typeof tags>;
@@ -94,6 +114,19 @@ export const tagsLink = pgTable(
     tag: varchar("tag").notNull(),
   },
   (table) => [primaryKey({ columns: [table.transaction_id, table.tag] })]
+);
+
+export const tagsLinkNew = pgTable(
+  "tags_link_new",
+  {
+    transaction_id: text("transaction_id")
+      .notNull()
+      .references(() => transactions.transaction_id),
+    tag_id: uuid("tag_id")
+      .notNull()
+      .references(() => tags_new.id),
+  },
+  (table) => [primaryKey({ columns: [table.transaction_id, table.tag_id] })]
 );
 
 export const tagsLinkRelations = relations(tagsLink, ({ one }) => ({

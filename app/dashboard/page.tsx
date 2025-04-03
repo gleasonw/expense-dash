@@ -11,12 +11,18 @@ import {
   tagsLink,
   tags,
   tagAllocations,
+  tags_new,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { desc, eq, sql, and, inArray } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
+
+// TODO
+// override dates, so you can put a charge towards next month's budget
+// tag creation/ multiple tags per transaction
+// monthly spending by category table view (choose tags)
 
 export default async function Dashboard() {
   const userWithAccount = await getUserWithToken();
@@ -146,6 +152,7 @@ export default async function Dashboard() {
           transactionsWithoutTag={ts.filter((t) => t.tagsLinks.length === 0)}
         />
       </div>
+      <TagMaker />
       <div className="flex w-full flex-wrap justify-center gap-10">
         <div className="flex flex-col gap-10 p-3 w-[900px]">
           <TargetForTagPicker />
@@ -165,6 +172,27 @@ export default async function Dashboard() {
           <SpendingTable rows={ts} />
         </div>
       </div>
+    </div>
+  );
+}
+
+async function TagMaker() {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
+  const existingTags = await db.query.tags_new.findMany({
+    where: eq(tags_new.userId, user.user.id),
+  });
+
+  return (
+    <div>
+      <div className="flex flex-col">
+        {existingTags.map((et) => (
+          <div key={et.id}>{et.label}</div>
+        ))}
+      </div>
+      <form></form>
     </div>
   );
 }
