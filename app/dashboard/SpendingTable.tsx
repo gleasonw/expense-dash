@@ -4,7 +4,7 @@ import { useContext, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { AppStoreContext, TagsContext } from "@/app/dashboard/Providers";
 import { TransactionWithTags } from "@/server/schema";
-import { addTagToTransaction } from "@/app/dashboard/actions";
+import { addTagToTransaction_v2 } from "@/app/dashboard/actions";
 import * as R from "remeda";
 
 const columns = [
@@ -102,7 +102,7 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
       key={transaction.transaction_id}
       className="border-spacing-5 border-2 odd:bg-gray-100"
     >
-      <td>
+      <td className="p-3">
         <TransactionCategorizer transaction={transaction} />
       </td>
       {columns.map((column) => (
@@ -118,25 +118,35 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
 export function TransactionCategorizer({
   transaction,
 }: {
-  transaction: Transaction & { tagsLinks?: { tag: { tag: string } }[] };
+  transaction: TransactionWithTags;
 }) {
   const tags = useContext(TagsContext);
   const [autoTagTransaction, setAutoTagTransaction] = useState(false);
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 flex-col">
+      <div className="flex flex-wrap gap-1">
+        {transaction.tags.map((t) => (
+          <span
+            key={t.tag}
+            className="bg-blue-200 text-blue-800 px-2 py-1 rounded-md"
+          >
+            {t.tag}
+          </span>
+        ))}
+      </div>
       <select
-        value={transaction.tagsLinks?.at(0)?.tag.tag ?? ""}
+        value={transaction.tags?.at(0)?.id ?? ""}
         onChange={(e) => {
-          addTagToTransaction({
-            tag: e.target.value,
-            transaction,
+          addTagToTransaction_v2({
+            tagId: e.target.value,
+            transactionId: transaction.transaction_id,
             autoTag: autoTagTransaction,
           });
         }}
       >
         {tags?.map((t) => (
-          <option key={t.tag} value={t.tag}>
+          <option key={t.tag} value={t.id}>
             {t.tag}
           </option>
         ))}

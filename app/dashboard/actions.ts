@@ -17,6 +17,21 @@ import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { Transaction } from "plaid";
 
+export async function createTag(formData: FormData) {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return;
+  }
+  const tag = formData.get("tag") as string;
+  await db.insert(tags_new).values({
+    tag,
+    label: tag,
+    color: "blue",
+    userId: user.user.id,
+  });
+  revalidatePath("/dashboard");
+}
+
 export async function setTagAllocation(formData: FormData) {
   "use server";
   const allocations = Array.from(formData.entries())
@@ -70,38 +85,6 @@ export async function addTransactions(
     .onConflictDoNothing();
 }
 
-export async function addTagToTransaction({
-  transaction,
-  tag,
-  autoTag,
-}: {
-  transaction: Transaction;
-  tag: string;
-  autoTag: boolean;
-}) {
-  const user = await getUserWithToken();
-
-  const transactionId = transaction.transaction_id;
-
-  console.log("adding tag", tag, "to transaction", transactionId);
-  // just allow one tag for now
-  await db.delete(tagsLink).where(eq(tagsLink.transaction_id, transactionId));
-  if (tag !== "") {
-    await db.insert(tagsLink).values({ transaction_id: transactionId, tag });
-    if (autoTag) {
-      await db.insert(auto_tag_merchants).values({
-        // not normalized but eh
-        name: transaction.name,
-        merchant_name: transaction.merchant_name,
-        tag,
-        user_id: user.user.id,
-        transaction_id: transactionId,
-      });
-    }
-  }
-  revalidatePath("/dashboard");
-}
-
 export async function addTagToTransaction_v2({
   transactionId,
   tagId,
@@ -111,6 +94,11 @@ export async function addTagToTransaction_v2({
   tagId: string;
   autoTag: boolean;
 }) {
+  console.log("adding tag to transaction", {
+    transactionId,
+    tagId,
+    autoTag,
+  });
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     // gotta figure out a way to do middleware or something and pass user as context, like trpc
