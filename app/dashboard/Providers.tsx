@@ -1,6 +1,6 @@
 "use client";
 
-import { Tag } from "@/server/schema";
+import { TransactionTag } from "@/app/dashboard/types";
 import { makeAutoObservable } from "mobx";
 import React from "react";
 
@@ -14,14 +14,14 @@ const appStore = new AppStore();
 
 export const AppStoreContext = React.createContext<AppStore | null>(null);
 
-export const TagsContext = React.createContext<Tag[] | null>(null);
+export const TagsContext = React.createContext<TransactionTag[] | null>(null);
 
 export function Providers({
   children,
   tags,
 }: {
   children: React.ReactNode;
-  tags: Tag[];
+  tags: TransactionTag[];
 }) {
   return (
     <TagsContext.Provider value={tags}>

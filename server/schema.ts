@@ -10,6 +10,7 @@ import {
 import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { relations, type InferSelectModel } from "drizzle-orm";
 import { Transaction } from "plaid";
+import { TransactionTag } from "@/app/dashboard/types";
 
 export const transactions = pgTable("transactions", {
   account_id: text("account_id").notNull(),
@@ -65,7 +66,7 @@ export const auto_tag_merchants_new = pgTable("auto_tag_merchants_new", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   merchant_name: varchar("merchant_name", { length: 255 }),
-  tag_id: varchar("tag_id", { length: 255 })
+  tag_id: uuid("tag_id")
     .references(() => tags_new.id)
     .notNull(),
   user_id: integer("user_id").references(() => userTable.id),
@@ -75,17 +76,25 @@ export const auto_tag_merchants_new = pgTable("auto_tag_merchants_new", {
 });
 
 export type TransactionWithTags = InferSelectModel<typeof transactions> & {
-  tagsLinks: InferSelectModel<typeof tagsLink> &
-    { tag: Tag; transaction: Transaction }[];
+  tags: TransactionTag[];
 };
 
 export const transactionsRelations = relations(transactions, ({ many }) => ({
   tagsLinks: many(tagsLink),
+  tagsLinkNew: many(tagsLinkNew),
 }));
 
 export const tags = pgTable("tags", {
   tag: varchar("tag", { length: 255 }).primaryKey(),
 });
+
+export const tagsRelations = relations(tags, ({ many, one }) => ({
+  tagsLinks: many(tagsLink),
+  allocation: one(tagAllocations, {
+    fields: [tags.tag],
+    references: [tagAllocations.tag],
+  }),
+}));
 
 export const tags_new = pgTable("tags_v2", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -97,14 +106,8 @@ export const tags_new = pgTable("tags_v2", {
     .notNull(),
 });
 
-export type Tag = InferSelectModel<typeof tags>;
-
-export const tagsRelations = relations(tags, ({ many, one }) => ({
-  tagsLinks: many(tagsLink),
-  allocation: one(tagAllocations, {
-    fields: [tags.tag],
-    references: [tagAllocations.tag],
-  }),
+export const tagsNewRelations = relations(tags_new, ({ many, one }) => ({
+  tagsLinks: many(tagsLinkNew),
 }));
 
 export const tagsLink = pgTable(
@@ -115,6 +118,17 @@ export const tagsLink = pgTable(
   },
   (table) => [primaryKey({ columns: [table.transaction_id, table.tag] })]
 );
+
+export const tagsLinkRelations = relations(tagsLink, ({ one }) => ({
+  transaction: one(transactions, {
+    fields: [tagsLink.transaction_id],
+    references: [transactions.transaction_id],
+  }),
+  tag: one(tags, {
+    fields: [tagsLink.tag],
+    references: [tags.tag],
+  }),
+}));
 
 export const tagsLinkNew = pgTable(
   "tags_link_new",
@@ -129,14 +143,14 @@ export const tagsLinkNew = pgTable(
   (table) => [primaryKey({ columns: [table.transaction_id, table.tag_id] })]
 );
 
-export const tagsLinkRelations = relations(tagsLink, ({ one }) => ({
+export const tagsLinkNewRelations = relations(tagsLinkNew, ({ one }) => ({
   transaction: one(transactions, {
-    fields: [tagsLink.transaction_id],
+    fields: [tagsLinkNew.transaction_id],
     references: [transactions.transaction_id],
   }),
-  tag: one(tags, {
-    fields: [tagsLink.tag],
-    references: [tags.tag],
+  tag: one(tags_new, {
+    fields: [tagsLinkNew.tag_id],
+    references: [tags_new.id],
   }),
 }));
 

@@ -1,8 +1,9 @@
 import { TransactionCategorizer } from "@/app/dashboard/SpendingTable";
+import { TransactionWithTags } from "@/server/schema";
 import { Transaction } from "plaid";
 
 type SpendingCategorizerProps = {
-  transactionsWithoutTag: Array<Transaction>;
+  transactionsWithoutTag: Array<TransactionWithTags>;
 };
 
 export function SpendingCategorizer({
@@ -11,6 +12,7 @@ export function SpendingCategorizer({
   if (transactionsWithoutTag.length === 0) {
     return <div>No transactions to categorize</div>;
   }
+  console.log(transactionsWithoutTag, "transactionsWithoutTag");
   return (
     <div className="flex flex-wrap gap-10">
       {transactionsWithoutTag.map((transaction) => (

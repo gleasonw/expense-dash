@@ -7,8 +7,35 @@ import {
   userTable,
   tags_new,
   tagsLinkNew,
+  auto_tag_merchants_new,
 } from "@/server/schema";
-import { eq, or } from "drizzle-orm";
+import { eq, or, and } from "drizzle-orm";
+
+export async function migrateAutoTagMerchants() {
+  const autoTagsWithNewIds = await db
+    .select()
+    .from(auto_tag_merchants)
+    .leftJoin(
+      tags_new,
+      and(
+        eq(auto_tag_merchants.tag, tags_new.tag),
+        eq(auto_tag_merchants.user_id, tags_new.userId)
+      )
+    );
+
+  const autoTagsToInsert = autoTagsWithNewIds.filter(
+    (at) => at.tags_v2 !== null
+  );
+  await db.insert(auto_tag_merchants_new).values(
+    autoTagsToInsert.map((at) => ({
+      name: at.auto_tag_merchants.name,
+      merchant_name: at.auto_tag_merchants.merchant_name,
+      tag_id: at.tags_v2!.id,
+      user_id: at.auto_tag_merchants.user_id,
+      transaction_id: at.auto_tag_merchants.transaction_id,
+    }))
+  );
+}
 
 export async function seedTags() {
   await db.insert(tags_new).values([
@@ -81,5 +108,5 @@ export async function applyAutoTagsToPendingTransactions(userId: number) {
   );
 }
 
-await seedTags();
+await migrateAutoTagMerchants();
 process.exit(0);

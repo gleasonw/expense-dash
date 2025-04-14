@@ -1,4 +1,8 @@
-import { addTransactions, setTagAllocation } from "@/app/dashboard/actions";
+import {
+  addTransactions,
+  createTag,
+  setTagAllocation,
+} from "@/app/dashboard/actions";
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { SpendingTable } from "@/app/dashboard/SpendingTable";
@@ -7,25 +11,31 @@ import { db } from "@/server/db";
 import {
   userTable,
   transactions,
-  auto_tag_merchants,
-  tagsLink,
-  tags,
   tagAllocations,
   tags_new,
+  tagsLinkNew,
+  auto_tag_merchants_new,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { desc, eq, sql, and, inArray } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
+import { SpendChecker } from "@/app/dashboard/SpendChecker";
+import Link from "next/link";
 
 // TODO
 // override dates, so you can put a charge towards next month's budget
-// tag creation/ multiple tags per transaction
 // monthly spending by category table view (choose tags)
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const userWithAccount = await getUserWithToken();
+  const params = await searchParams;
+  const filterByTag = params.tag as string | undefined;
   if (userWithAccount === "no-plaid-account") {
     return redirect("/link");
   }
@@ -44,16 +54,23 @@ export default async function Dashboard() {
 
   const autoTags = await db
     .select()
-    .from(auto_tag_merchants)
+    .from(auto_tag_merchants_new)
     .where(
       and(
         inArray(
-          auto_tag_merchants.name,
+          auto_tag_merchants_new.name,
           latestTransactions.data.added.map((t) => t.name)
         ),
-        eq(auto_tag_merchants.user_id, userWithAccount.user.id)
+        eq(auto_tag_merchants_new.user_id, userWithAccount.user.id)
       )
     );
+
+  console.log(
+    "latestTransactions",
+    latestTransactions.data.added.map((t) => t.name)
+  );
+
+  console.log("autoTags", autoTags);
 
   const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
 
@@ -79,10 +96,10 @@ export default async function Dashboard() {
 
   if (transactionsToAutotag.length > 0) {
     operationsToRun.push(
-      db.insert(tagsLink).values(
+      db.insert(tagsLinkNew).values(
         transactionsToAutotag.map((t) => ({
           transaction_id: t.transaction_id,
-          tag: t.tag,
+          tag_id: t.tag,
         }))
       )
     );
@@ -90,12 +107,13 @@ export default async function Dashboard() {
 
   await Promise.allSettled(operationsToRun);
 
+  // todo: make these fetches concurrent
   const discretionarySpendingByMonth = await db.execute(
     sql`
       SELECT
           DATE_TRUNC('month', t.date) AS month,
           SUM(CAST(t.amount AS NUMERIC)) AS amount,
-          tl.tag,
+          tv.tag,
           CASE
               WHEN DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE)
               THEN TRUE
@@ -104,22 +122,61 @@ export default async function Dashboard() {
       FROM
           transactions t
       JOIN
-          tags_link tl ON t.transaction_id = tl.transaction_id
+          tags_link_new tl ON t.transaction_id = tl.transaction_id
+      JOIN
+          tags_v2 tv ON tl.tag_id = tv.id
       WHERE
           t.user_id = ${userWithAccount.user.id}
-          AND tl.tag not in ('income', 'transfer')
+          AND tv.tag not in ('income', 'transfer')
       GROUP BY
-          DATE_TRUNC('month', t.date), tl.tag
+          DATE_TRUNC('month', t.date), tv.id
       ORDER BY
           month;
     `
   );
 
-  const ts = await db.query.transactions.findMany({
-    with: { tagsLinks: { with: { tag: true } } },
-    where: eq(transactions.user_id, userWithAccount.user.id),
-    orderBy: [desc(transactions.date)],
-  });
+  const ts = await db
+    .select()
+    .from(transactions)
+    .leftJoin(
+      tagsLinkNew,
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+    )
+    .leftJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+    .where(
+      filterByTag
+        ? and(
+            eq(transactions.user_id, userWithAccount.user.id),
+            eq(tags_new.tag, filterByTag)
+          )
+        : eq(transactions.user_id, userWithAccount.user.id)
+    )
+    .orderBy(desc(transactions.datetime));
+
+  const tsMerged = Object.values(
+    R.groupBy(ts, (t) => t.transactions.transaction_id)
+  )
+    .map((tagsForTransaction) => {
+      const baseTransaction = tagsForTransaction[0].transactions;
+      const tags = tagsForTransaction
+        .map((t) => t.tags_v2)
+        .filter((t) => t !== null);
+      return {
+        ...baseTransaction,
+        tags,
+      };
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.datetime);
+      const dateB = new Date(b.datetime);
+      if (dateA < dateB) {
+        return 1;
+      } else if (dateA > dateB) {
+        return -1;
+      } else {
+        return 0;
+      }
+    });
 
   const incomeQuery = (await db.execute(
     sql`
@@ -149,11 +206,10 @@ export default async function Dashboard() {
     <div className="flex flex-col gap-4 items-center">
       <div className="border shadow-lg w-full p-3 flex items-center justify-center flex-wrap">
         <SpendingCategorizer
-          transactionsWithoutTag={ts.filter((t) => t.tagsLinks.length === 0)}
+          transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
         />
       </div>
-      <TagMaker />
-      <div className="flex w-full flex-wrap justify-center gap-10">
+      <div className="grid lg:grid-cols-2 gap-20">
         <div className="flex flex-col gap-10 p-3 w-[900px]">
           <TargetForTagPicker />
           <div className="bg-gray-100 rounded-lg pg-3">
@@ -167,13 +223,73 @@ export default async function Dashboard() {
           <SpendingChart
             discretionaryByMonth={discretionarySpendingByMonth.rows}
           />
+          <HowMuchDidISpendOnTag />
         </div>
-        <div className="max-w-[800px]">
-          <SpendingTable rows={ts} />
+
+        <div className="max-w-[1000px]">
+          <TagMaker />
+          <TransactionFilters />
+          <SpendingTable rows={tsMerged} />
         </div>
       </div>
     </div>
   );
+}
+
+async function TransactionFilters() {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
+  const userTags = await db.query.tags_new.findMany({
+    where: eq(tags_new.userId, user.user.id),
+  });
+  return (
+    <div className="flex flex-wrap gap-2">
+      {userTags.map((t) => (
+        <Link href={`?tag=${t.tag}`} key={t.tag}>
+          <div className="p-2 border hover:bg-gray-200">{t.tag}</div>
+        </Link>
+      ))}
+      <Link href={`/dashboard`}>
+        <div className="p-2 border hover:bg-gray-200">All</div>
+      </Link>
+    </div>
+  );
+}
+
+async function HowMuchDidISpendOnTag() {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
+  const spendingByTagLastMonth = (await db.execute(
+    sql`
+    SELECT
+        DATE_TRUNC('month', t.date) AS month,
+        SUM(CAST(t.amount AS NUMERIC)) AS amount,
+        tv.tag,
+        tv.id as tag_id
+    FROM
+        transactions t
+    JOIN
+        tags_link_new tln ON t.transaction_id = tln.transaction_id
+    JOIN
+        tags_v2 tv ON tln.tag_id = tv.id
+    WHERE
+        t.user_id = ${user.user.id}
+        AND tv.tag not in ('income', 'transfer')
+        AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+    GROUP BY
+        DATE_TRUNC('month', t.date), tv.tag, tv.id
+    ORDER BY
+        month;
+    `
+  )) as {
+    rows: { month: string; amount: string; tag: string; tag_id: string }[];
+  };
+
+  return <SpendChecker spending={spendingByTagLastMonth.rows} />;
 }
 
 async function TagMaker() {
@@ -181,17 +297,23 @@ async function TagMaker() {
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
-  const existingTags = await db.query.tags_new.findMany({
-    where: eq(tags_new.userId, user.user.id),
-  });
 
   return (
     <div>
-      <div className="flex flex-col">
-        {existingTags.map((et) => (
-          <div key={et.id}>{et.label}</div>
-        ))}
-      </div>
+      <h1 className="text-lg">Tags</h1>
+      <form action={createTag}>
+        <input
+          name="tag"
+          type="text"
+          className="border rounded-md shadow-sm"
+          placeholder="tag"
+        />
+
+        <button type="submit" className="p-2 border hover:bg-gray-200">
+          Create
+        </button>
+      </form>
+
       <form></form>
     </div>
   );
