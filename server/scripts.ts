@@ -1,7 +1,6 @@
 import { db } from "@/server/db";
 import {
   auto_tag_merchants,
-  tags,
   tagsLink,
   transactions,
   userTable,

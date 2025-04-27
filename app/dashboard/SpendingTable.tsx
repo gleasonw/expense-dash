@@ -4,7 +4,10 @@ import { useContext, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { AppStoreContext, TagsContext } from "@/app/dashboard/Providers";
 import { TransactionWithTags } from "@/server/schema";
-import { addTagToTransaction_v2 } from "@/app/dashboard/actions";
+import {
+  addTagToTransaction_v2,
+  removeTagFromTransaction,
+} from "@/app/dashboard/actions";
 import * as R from "remeda";
 
 const columns = [
@@ -127,12 +130,18 @@ export function TransactionCategorizer({
     <div className="flex gap-2 flex-col">
       <div className="flex flex-wrap gap-1">
         {transaction.tags.map((t) => (
-          <span
+          <button
             key={t.tag}
-            className="bg-blue-200 text-blue-800 px-2 py-1 rounded-md"
+            className="bg-blue-200 text-blue-800 px-2 py-1 rounded-md hover:bg-blue-300"
+            onClick={() => {
+              removeTagFromTransaction({
+                transactionId: transaction.transaction_id,
+                tagId: t.id,
+              });
+            }}
           >
             {t.tag}
-          </span>
+          </button>
         ))}
       </div>
       <select

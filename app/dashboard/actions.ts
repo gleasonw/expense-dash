@@ -17,6 +17,28 @@ import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { Transaction } from "plaid";
 
+export async function removeTagFromTransaction({
+  transactionId,
+  tagId,
+}: {
+  transactionId: string;
+  tagId: string;
+}) {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return;
+  }
+  await db
+    .delete(tagsLinkNew)
+    .where(
+      and(
+        eq(tagsLinkNew.transaction_id, transactionId),
+        eq(tagsLinkNew.tag_id, tagId)
+      )
+    );
+  revalidatePath("/dashboard");
+}
+
 export async function createTag(formData: FormData) {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
