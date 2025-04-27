@@ -17,16 +17,27 @@ import {
   auto_tag_merchants_new,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { desc, eq, sql, and, inArray } from "drizzle-orm";
+import { eq, sql, and, inArray } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
 import { SpendChecker } from "@/app/dashboard/SpendChecker";
 import Link from "next/link";
+import { Transaction } from "plaid";
+import { AppTransaction } from "@/app/dashboard/types";
 
 // TODO
 // override dates, so you can put a charge towards next month's budget
 // monthly spending by category table view (choose tags)
+// why is the sorting so strange? why would adding a tag change sorting?
+
+/**annoying drizzle parsing numbers to strings for postgres precision reasons */
+function toAppTransaction(transactions: Transaction[]): AppTransaction[] {
+  return transactions.map((t) => ({
+    ...t,
+    amount: t.amount.toString(),
+  })) as AppTransaction[];
+}
 
 export default async function Dashboard({
   searchParams,
@@ -47,10 +58,10 @@ export default async function Dashboard({
       cursor: userWithAccount.user.nextTransactionCursor ?? undefined,
     });
   } catch (e) {
-    console.log(e.response.data);
-    console.log(e.message);
     return "check server";
   }
+
+  const newTransactions = toAppTransaction(latestTransactions.data.added);
 
   const autoTags = await db
     .select()
@@ -59,18 +70,11 @@ export default async function Dashboard({
       and(
         inArray(
           auto_tag_merchants_new.name,
-          latestTransactions.data.added.map((t) => t.name)
+          newTransactions.map((t) => t.name)
         ),
         eq(auto_tag_merchants_new.user_id, userWithAccount.user.id)
       )
     );
-
-  console.log(
-    "latestTransactions",
-    latestTransactions.data.added.map((t) => t.name)
-  );
-
-  console.log("autoTags", autoTags);
 
   const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
 
@@ -80,10 +84,10 @@ export default async function Dashboard({
       if (!autoTag) {
         return acc;
       }
-      acc.push({ transaction_id: t.transaction_id, tag: autoTag.tag });
+      acc.push({ transaction_id: t.transaction_id, tag_id: autoTag.tag_id });
       return acc;
     },
-    [] as { transaction_id: string; tag: string }[]
+    [] as { transaction_id: string; tag_id: string }[]
   );
 
   const operationsToRun = [
@@ -91,7 +95,7 @@ export default async function Dashboard({
       .update(userTable)
       .set({ nextTransactionCursor: latestTransactions.data.next_cursor })
       .where(eq(userTable.id, userWithAccount.user.id)),
-    addTransactions(latestTransactions.data.added),
+    addTransactions(newTransactions),
   ];
 
   if (transactionsToAutotag.length > 0) {
@@ -99,7 +103,7 @@ export default async function Dashboard({
       db.insert(tagsLinkNew).values(
         transactionsToAutotag.map((t) => ({
           transaction_id: t.transaction_id,
-          tag_id: t.tag,
+          tag_id: t.tag_id,
         }))
       )
     );
@@ -108,7 +112,7 @@ export default async function Dashboard({
   await Promise.allSettled(operationsToRun);
 
   // todo: make these fetches concurrent
-  const discretionarySpendingByMonth = await db.execute(
+  const spendingByMonth = (await db.execute(
     sql`
       SELECT
           DATE_TRUNC('month', t.date) AS month,
@@ -133,7 +137,14 @@ export default async function Dashboard({
       ORDER BY
           month;
     `
-  );
+  )) as {
+    rows: {
+      month: string;
+      amount: string;
+      tag: string;
+      is_current_month: boolean;
+    }[];
+  };
 
   const ts = await db
     .select()
@@ -151,7 +162,9 @@ export default async function Dashboard({
           )
         : eq(transactions.user_id, userWithAccount.user.id)
     )
-    .orderBy(desc(transactions.datetime));
+    .orderBy(sql`${transactions.datetime} DESC nulls last`);
+
+  console.log(ts.at(0));
 
   const tsMerged = Object.values(
     R.groupBy(ts, (t) => t.transactions.transaction_id)
@@ -167,8 +180,8 @@ export default async function Dashboard({
       };
     })
     .sort((a, b) => {
-      const dateA = new Date(a.datetime);
-      const dateB = new Date(b.datetime);
+      const dateA = new Date(a.datetime ?? a.authorized_date ?? "");
+      const dateB = new Date(b.datetime ?? b.authorized_date ?? "");
       if (dateA < dateB) {
         return 1;
       } else if (dateA > dateB) {
@@ -183,17 +196,19 @@ export default async function Dashboard({
     SELECT
       DATE_TRUNC('month', t.date) AS month,
       SUM(CAST(t.amount AS NUMERIC)) AS amount,
-      tl.tag
+      tv.tag
     FROM
         transactions t
     JOIN
-        tags_link tl ON t.transaction_id = tl.transaction_id
+        tags_link_new tl ON t.transaction_id = tl.transaction_id
+    JOIN
+        tags_v2 tv ON tl.tag_id = tv.id
     WHERE
         t.user_id = ${userWithAccount.user.id}
         AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
-        AND tl.tag = 'income'
+        AND tv.tag = 'income'
     GROUP BY
-        DATE_TRUNC('month', t.date), tl.tag
+        DATE_TRUNC('month', t.date), tv.tag
     ORDER BY
         month;
 `
@@ -214,16 +229,12 @@ export default async function Dashboard({
           <TargetForTagPicker />
           <div className="bg-gray-100 rounded-lg pg-3">
             <div>Todo: picker for monthly/quarterly</div>
-            <Income
-              taggedSpendingByPeriod={discretionarySpendingByMonth.rows}
-            />
+            <Income taggedSpendingByPeriod={spendingByMonth.rows} />
             <NetSpending estimatedIncomeForPeriod={estIncomeForPeriod} />
             <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
           </div>
-          <SpendingChart
-            discretionaryByMonth={discretionarySpendingByMonth.rows}
-          />
-          <HowMuchDidISpendOnTag />
+          <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
+          <HowMuchDidISpendOnTag spendingByMonth={spendingByMonth.rows} />
         </div>
 
         <div className="max-w-[1000px]">
@@ -258,7 +269,11 @@ async function TransactionFilters() {
   );
 }
 
-async function HowMuchDidISpendOnTag() {
+async function HowMuchDidISpendOnTag({
+  spendingByMonth,
+}: {
+  spendingByMonth: { month: string; amount: string; tag: string }[];
+}) {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
@@ -289,7 +304,11 @@ async function HowMuchDidISpendOnTag() {
     rows: { month: string; amount: string; tag: string; tag_id: string }[];
   };
 
-  return <SpendChecker spending={spendingByTagLastMonth.rows} />;
+  return (
+    <>
+      <SpendChecker spending={spendingByTagLastMonth.rows} />
+    </>
+  );
 }
 
 async function TagMaker() {
@@ -325,25 +344,36 @@ async function NetSpending({
   estimatedIncomeForPeriod: number;
 }) {
   const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
 
-  const spendingQuery = await db.execute(
+  const spendingQuery = (await db.execute(
     sql`
-    SELECT
-      DATE_TRUNC('month', t.date) AS month,
-      SUM(CAST(t.amount AS NUMERIC)) AS amount
-    FROM
-      transactions t
-      JOIN tags_link tl ON t.transaction_id = tl.transaction_id
-    WHERE
-      t.user_id = ${user.user.id}
-      AND tl.tag IN ('expenses', 'savings', 'discretionary', 'giving')
-      AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
-      AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-    GROUP BY
-      DATE_TRUNC('month', t.date);
+      SELECT
+        DATE_TRUNC('month', t.date) AS month,
+        SUM(CAST(t.amount AS NUMERIC)) AS amount
+      FROM
+        transactions t
+      WHERE
+        t.user_id = ${user.user.id}
+        AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
+        AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+        AND t.transaction_id IN (
+          SELECT DISTINCT tl.transaction_id
+          FROM tags_link_new tl
+          JOIN tags_v2 tv ON tl.tag_id = tv.id
+          WHERE tv.tag NOT IN ('income', 'transfer')
+        )
+      GROUP BY
+        DATE_TRUNC('month', t.date);
     `
-  );
+  )) as {
+    rows: { month: string; amount: string }[];
+  };
   const spendingForMonth = spendingQuery.rows?.[0]?.amount;
+  console.log({ spendingQuery });
+
   const spendingForMonthInt = parseInt(spendingForMonth ?? "", 10);
   return (
     <div>
@@ -359,23 +389,29 @@ async function Expenses({
   estimatedIncomeForPeriod: number;
 }) {
   const user = await getUserWithToken();
-  const expenseQuery = await db.execute(
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
+  const expenseQuery = (await db.execute(
     sql`
     SELECT
       DATE_TRUNC('month', t.date) AS month,
       SUM(CAST(t.amount AS NUMERIC)) AS amount
     FROM
       transactions t
-      JOIN tags_link tl ON t.transaction_id = tl.transaction_id
+      JOIN tags_link_new tl ON t.transaction_id = tl.transaction_id
+      JOIN tags_v2 tv ON tl.tag_id = tv.id
     WHERE
       t.user_id = ${user.user.id}
-      AND tl.tag IN ('expenses')
+      AND tv.tag IN ('expenses')
       AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
       AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
     GROUP BY
       DATE_TRUNC('month', t.date);
     `
-  );
+  )) as {
+    rows: { month: string; amount: string }[];
+  };
   const expensesForPeriod = parseInt(expenseQuery.rows?.[0]?.amount ?? "", 10);
   const expenseAllocation = await db.query.tagAllocations.findFirst({
     where: eq(tagAllocations.tag, "expenses"),
@@ -451,10 +487,16 @@ async function Income({
     is_current_month: boolean;
   }[];
 }) {
+  console.log(taggedSpendingByPeriod);
   const user = await getUserWithToken();
-  // todo: dedupe
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
+  // todo: dedupe, migrate to new custom tag model
   const allTags = await db.query.tags.findMany({ with: { allocation: true } });
-  const tagsTracked = allTags.filter((t) => toTrack.includes(t.tag));
+  const tagsTracked = allTags.filter((t) =>
+    toTrack.includes(t.tag as TargetKind)
+  );
   console.log(tagsTracked);
   const targets = tagsTracked.reduce((acc, t) => {
     if (isNaN(parseInt(t.allocation.allocation))) {
@@ -469,17 +511,18 @@ async function Income({
     SELECT
       DATE_TRUNC('month', t.date) AS month,
       SUM(CAST(t.amount AS NUMERIC)) AS amount,
-      tl.tag
+      tv.tag
     FROM
         transactions t
     JOIN
-        tags_link tl ON t.transaction_id = tl.transaction_id
-    WHERE
+        tags_link_new tl ON t.transaction_id = tl.transaction_id
+    JOIN tags_v2 tv ON tl.tag_id = tv.id
+        WHERE
         t.user_id = ${user.user.id}
         AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
-        AND tl.tag in ('income', 'expenses')
+        AND tv.tag in ('income', 'expenses')
     GROUP BY
-        DATE_TRUNC('month', t.date), tl.tag
+        DATE_TRUNC('month', t.date), tv.tag
     ORDER BY
         month;
 `
@@ -493,6 +536,8 @@ async function Income({
     estimatedIncomeAndExpenses.rows,
     (r) => r.tag
   );
+
+  console.log({ income, expenses });
 
   const currentPeriodSpendingByTag = R.indexBy(
     currentPeriodSpending,
@@ -518,10 +563,10 @@ async function Income({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-5">
         <div className="flex gap-10 w-full">
-          <Label text="Income">
+          <Label text="Est. Income">
             <span>${estIncome}</span>
           </Label>
-          <Label text="Expenses">-${estExpenses}</Label>
+          <Label text="Est. Expenses">-${estExpenses}</Label>
           <Label text="To allocate">
             <span>${estIncome - estExpenses}</span>
           </Label>
