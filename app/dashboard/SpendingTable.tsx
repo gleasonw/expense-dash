@@ -91,7 +91,7 @@ export const SpendingTable = observer(function QueryResults({
         view, etc
       </span>
       {rows.map((item) => (
-        <div className="flex flex-col">
+        <div className="flex flex-col" key={item.transaction_id}>
           <DisplayUnknownObject obj={item} />
         </div>
       ))}

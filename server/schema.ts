@@ -9,7 +9,6 @@ import {
 } from "drizzle-orm/pg-core";
 import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { relations, type InferSelectModel } from "drizzle-orm";
-import { Transaction } from "plaid";
 import { TransactionTag } from "@/app/dashboard/types";
 
 export const transactions = pgTable("transactions", {
@@ -106,7 +105,7 @@ export const tags_new = pgTable("tags_v2", {
     .notNull(),
 });
 
-export const tagsNewRelations = relations(tags_new, ({ many, one }) => ({
+export const tagsNewRelations = relations(tags_new, ({ many }) => ({
   tagsLinks: many(tagsLinkNew),
 }));
 

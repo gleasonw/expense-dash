@@ -1,6 +1,5 @@
 import { TransactionCategorizer } from "@/app/dashboard/SpendingTable";
 import { TransactionWithTags } from "@/server/schema";
-import { Transaction } from "plaid";
 
 type SpendingCategorizerProps = {
   transactionsWithoutTag: Array<TransactionWithTags>;

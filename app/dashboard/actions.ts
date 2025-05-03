@@ -4,14 +4,11 @@
 import { db } from "@/server/db";
 import { getUserWithToken } from "@/server/session";
 import {
-  auto_tag_merchants,
   auto_tag_merchants_new,
   tagAllocations,
   tags_new,
-  tagsLink,
   tagsLinkNew,
   transactions,
-  User,
 } from "@/server/schema";
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
