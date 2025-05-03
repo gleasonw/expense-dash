@@ -14,7 +14,7 @@ export default async function Link() {
       language: "en",
       products: [Products.Auth, Products.Transactions],
       country_codes: [CountryCode.Us],
-      redirect_uri: process.env.PLAID_SANDBOX_REDIRECT_URI,
+      redirect_uri: process.env.PLAID_REDIRECT_URI,
     });
   } catch (e) {
     if (e instanceof Error) {
