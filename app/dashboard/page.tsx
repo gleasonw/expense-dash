@@ -58,6 +58,7 @@ export default async function Dashboard({
       cursor: userWithAccount.user.nextTransactionCursor ?? undefined,
     });
   } catch (e) {
+    console.error("Error fetching transactions", e);
     return "check server";
   }
 
@@ -164,8 +165,6 @@ export default async function Dashboard({
     )
     .orderBy(sql`${transactions.datetime} DESC nulls last`);
 
-  console.log(ts.at(0));
-
   const tsMerged = Object.values(
     R.groupBy(ts, (t) => t.transactions.transaction_id)
   )
@@ -234,7 +233,7 @@ export default async function Dashboard({
             <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
           </div>
           <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
-          <HowMuchDidISpendOnTag spendingByMonth={spendingByMonth.rows} />
+          <HowMuchDidISpendOnTag />
         </div>
 
         <div className="max-w-[1000px]">
@@ -269,11 +268,7 @@ async function TransactionFilters() {
   );
 }
 
-async function HowMuchDidISpendOnTag({
-  spendingByMonth,
-}: {
-  spendingByMonth: { month: string; amount: string; tag: string }[];
-}) {
+async function HowMuchDidISpendOnTag() {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
@@ -372,7 +367,6 @@ async function NetSpending({
     rows: { month: string; amount: string }[];
   };
   const spendingForMonth = spendingQuery.rows?.[0]?.amount;
-  console.log({ spendingQuery });
 
   const spendingForMonthInt = parseInt(spendingForMonth ?? "", 10);
   return (
@@ -487,7 +481,6 @@ async function Income({
     is_current_month: boolean;
   }[];
 }) {
-  console.log(taggedSpendingByPeriod);
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
@@ -497,7 +490,6 @@ async function Income({
   const tagsTracked = allTags.filter((t) =>
     toTrack.includes(t.tag as TargetKind)
   );
-  console.log(tagsTracked);
   const targets = tagsTracked.reduce((acc, t) => {
     if (isNaN(parseInt(t.allocation.allocation))) {
       return acc;
@@ -536,8 +528,6 @@ async function Income({
     estimatedIncomeAndExpenses.rows,
     (r) => r.tag
   );
-
-  console.log({ income, expenses });
 
   const currentPeriodSpendingByTag = R.indexBy(
     currentPeriodSpending,

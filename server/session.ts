@@ -108,7 +108,7 @@ async function validateSessionToken(
     return { session: null, user: null };
   }
 
-  const { session, user } = result[0];
+  const { session, user } = result[0]!;
   if (Date.now() >= session.expiresAt.getTime()) {
     await invalidateSession(sessionId);
     return { session: null, user: null };
