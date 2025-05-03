@@ -17,8 +17,9 @@ export default async function Link() {
       redirect_uri: process.env.PLAID_SANDBOX_REDIRECT_URI,
     });
   } catch (e) {
-    console.log(e.response.data);
-    console.log(e.message);
+    if (e instanceof Error) {
+      console.log(e.message);
+    }
   }
 
   if (!tokenResponse) {
