@@ -31,6 +31,8 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
     return {
       chart: {
         type: "column",
+        width: null,
+        height: null,
       },
       title: {
         text: "Monthly Spending by Category",

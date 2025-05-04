@@ -8,36 +8,35 @@ import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { SpendingTable } from "@/app/dashboard/SpendingTable";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
+import * as style from "@/app/dashboard/dashboard.module.css";
 import {
   userTable,
   transactions,
   tagAllocations,
   tags_new,
   tagsLinkNew,
-  auto_tag_merchants_new,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { eq, sql, and, inArray } from "drizzle-orm";
+import { eq, sql, and, inArray, desc } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
 import { SpendChecker } from "@/app/dashboard/SpendChecker";
 import Link from "next/link";
-import { Transaction } from "plaid";
-import { AppTransaction } from "@/app/dashboard/types";
+import {
+  autoTagTransactions,
+  tryAutoTagTransactions,
+} from "@/app/dashboard/transactions_sdk";
+import {
+  formatCurrency,
+  toAppTransaction,
+} from "@/app/dashboard/transaction_utils";
+import { Suspense } from "react";
 
 // TODO
 // override dates, so you can put a charge towards next month's budget
 // monthly spending by category table view (choose tags)
 // why is the sorting so strange? why would adding a tag change sorting?
-
-/**annoying drizzle parsing numbers to strings for postgres precision reasons */
-function toAppTransaction(transactions: Transaction[]): AppTransaction[] {
-  return transactions.map((t) => ({
-    ...t,
-    amount: t.amount.toString(),
-  })) as AppTransaction[];
-}
 
 export default async function Dashboard({
   searchParams,
@@ -64,51 +63,14 @@ export default async function Dashboard({
 
   const newTransactions = toAppTransaction(latestTransactions.data.added);
 
-  const autoTags = await db
-    .select()
-    .from(auto_tag_merchants_new)
-    .where(
-      and(
-        inArray(
-          auto_tag_merchants_new.name,
-          newTransactions.map((t) => t.name)
-        ),
-        eq(auto_tag_merchants_new.user_id, userWithAccount.user.id)
-      )
-    );
-
-  const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
-
-  const transactionsToAutotag = latestTransactions.data.added.reduce(
-    (acc, t) => {
-      const autoTag = autoTagsByName[t.name];
-      if (!autoTag) {
-        return acc;
-      }
-      acc.push({ transaction_id: t.transaction_id, tag_id: autoTag.tag_id });
-      return acc;
-    },
-    [] as { transaction_id: string; tag_id: string }[]
-  );
-
   const operationsToRun = [
     db
       .update(userTable)
       .set({ nextTransactionCursor: latestTransactions.data.next_cursor })
       .where(eq(userTable.id, userWithAccount.user.id)),
     addTransactions(newTransactions),
+    autoTagTransactions(newTransactions),
   ];
-
-  if (transactionsToAutotag.length > 0) {
-    operationsToRun.push(
-      db.insert(tagsLinkNew).values(
-        transactionsToAutotag.map((t) => ({
-          transaction_id: t.transaction_id,
-          tag_id: t.tag_id,
-        }))
-      )
-    );
-  }
 
   await Promise.allSettled(operationsToRun);
 
@@ -163,32 +125,22 @@ export default async function Dashboard({
           )
         : eq(transactions.user_id, userWithAccount.user.id)
     )
-    .orderBy(sql`${transactions.datetime} DESC nulls last`);
+    .orderBy(desc(transactions.date));
+
+  console.log(ts);
 
   const tsMerged = Object.values(
     R.groupBy(ts, (t) => t.transactions.transaction_id)
-  )
-    .map((tagsForTransaction) => {
-      const baseTransaction = tagsForTransaction[0].transactions;
-      const tags = tagsForTransaction
-        .map((t) => t.tags_v2)
-        .filter((t) => t !== null);
-      return {
-        ...baseTransaction,
-        tags,
-      };
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.datetime ?? a.authorized_date ?? "");
-      const dateB = new Date(b.datetime ?? b.authorized_date ?? "");
-      if (dateA < dateB) {
-        return 1;
-      } else if (dateA > dateB) {
-        return -1;
-      } else {
-        return 0;
-      }
-    });
+  ).map((tagsForTransaction) => {
+    const baseTransaction = tagsForTransaction[0].transactions;
+    const tags = tagsForTransaction
+      .map((t) => t.tags_v2)
+      .filter((t) => t !== null);
+    return {
+      ...baseTransaction,
+      tags,
+    };
+  });
 
   const incomeQuery = (await db.execute(
     sql`
@@ -217,31 +169,154 @@ export default async function Dashboard({
   );
 
   return (
-    <div className="flex flex-col gap-4 items-center">
+    <div className="flex flex-col gap-4 items-center w-full h-full">
       <div className="border shadow-lg w-full p-3 flex items-center justify-center flex-wrap">
         <SpendingCategorizer
           transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
         />
+        <button className="border" onClick={tryAutoTagTransactions}>
+          Autotag transactions
+        </button>
       </div>
-      <div className="grid lg:grid-cols-2 gap-20">
-        <div className="flex flex-col gap-10 p-3 w-[900px]">
-          <TargetForTagPicker />
-          <div className="bg-gray-100 rounded-lg pg-3">
-            <div>Todo: picker for monthly/quarterly</div>
+      <TargetForTagPicker />
+      <div className={style.chart}>
+        <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
+      </div>
+
+      <div className="flex">
+        <div className="flex flex-col gap-10 p-3">
+          <div className="bg-gray-100 rounded-lg pg-3 max-w-[600px]">
             <Income taggedSpendingByPeriod={spendingByMonth.rows} />
-            <NetSpending estimatedIncomeForPeriod={estIncomeForPeriod} />
             <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
           </div>
-          <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
+          <Suspense>
+            <NetSpendingByMonth />
+          </Suspense>
           <HowMuchDidISpendOnTag />
         </div>
 
-        <div className="max-w-[1000px]">
+        <div className="w-full">
           <TagMaker />
           <TransactionFilters />
           <SpendingTable rows={tsMerged} />
         </div>
       </div>
+    </div>
+  );
+}
+
+async function NetSpendingByMonth() {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
+  const netSpend = (await db.execute(`
+     WITH monthly_income AS (
+      -- Calculate total income per month
+      SELECT
+        DATE_TRUNC('month', t.date) AS month,
+        SUM(CAST(t.amount AS NUMERIC)) * -1 AS total_income
+      FROM
+        transactions t
+      JOIN tags_link_new tl ON t.transaction_id = tl.transaction_id
+      JOIN tags_v2 tv ON tl.tag_id = tv.id
+      WHERE
+        t.user_id = ${user.user.id}
+        AND tv.tag = 'income' -- Only include transactions tagged as 'income'
+      GROUP BY
+        DATE_TRUNC('month', t.date)
+    ), monthly_spending AS (
+      -- Calculate total spending per month (your original query logic)
+      SELECT
+        DATE_TRUNC('month', t.date) AS month,
+        SUM(CAST(t.amount AS NUMERIC)) AS total_spending
+      FROM
+        transactions t
+      WHERE
+        t.user_id = ${user.user.id}
+        AND t.transaction_id IN (
+          SELECT DISTINCT tl.transaction_id
+          FROM tags_link_new tl
+          JOIN tags_v2 tv ON tl.tag_id = tv.id
+          WHERE tv.tag NOT IN ('income', 'transfer') -- Exclude income & transfers
+        )
+      GROUP BY
+        DATE_TRUNC('month', t.date)
+    )
+    -- Combine income and spending, calculate net
+    SELECT
+      COALESCE(mi.month, ms.month) AS month, -- Use COALESCE in case a month has only income or only spending
+      COALESCE(mi.total_income, 0) AS total_income,
+      COALESCE(ms.total_spending, 0) AS total_spending,
+      (COALESCE(mi.total_income, 0) - COALESCE(ms.total_spending, 0)) AS net_amount
+    FROM
+      monthly_income mi
+    FULL OUTER JOIN -- Use FULL OUTER JOIN to include months with only income or only spending
+      monthly_spending ms ON mi.month = ms.month
+    ORDER BY
+      month ASC;
+`)) as {
+    rows: {
+      month: string;
+      total_income: string;
+      total_spending: string;
+      net_amount: string;
+    }[];
+  };
+  console.log(netSpend.rows);
+  return (
+    <div className="flex flex-wrap gap-5">
+      {netSpend.rows.map((r) => {
+        // Parse amounts once for clarity and safety
+        const income = parseInt(r.total_income, 10) || 0;
+        const spending = parseInt(r.total_spending, 10) || 0;
+        const net = parseInt(r.net_amount, 10) || 0;
+
+        // Determine the color class based on the net amount
+        const netColorClass =
+          net > 0
+            ? "text-green-600" // Surplus
+            : net < 0
+            ? "text-red-600" // Deficit
+            : "text-black"; // Zero or default
+
+        return (
+          <div
+            key={r.month} // Assuming r.month is unique and stable (like '2023-10-01T00:00:00.000Z')
+            className="flex w-48 flex-col gap-2 rounded border bg-white p-4 shadow-lg" // Added width, rounded corners, adjusted gap/padding
+          >
+            {/* Format the month nicely */}
+            <span className="mb-2 text-center font-semibold text-gray-700">
+              {new Date(r.month).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                timeZone: "UTC",
+              })}
+            </span>
+            <Label text={"Income"} className="text-md">
+              {" "}
+              {/* Adjusted size */}
+              <span className="text-right font-medium">
+                {formatCurrency(income)}
+              </span>
+            </Label>
+            <Label text={"Spending"} className="text-md">
+              <span className="text-right font-medium">
+                {formatCurrency(spending)}
+              </span>
+            </Label>
+            <hr className="my-1" /> {/* Optional separator */}
+            <Label text={"Net"} className="text-md font-semibold">
+              {" "}
+              {/* Make Net label bold */}
+              {/* Apply the conditional color class */}
+              <span className={`text-right font-bold ${netColorClass}`}>
+                {formatCurrency(net)}
+              </span>
+            </Label>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -333,50 +408,6 @@ async function TagMaker() {
   );
 }
 
-async function NetSpending({
-  estimatedIncomeForPeriod,
-}: {
-  estimatedIncomeForPeriod: number;
-}) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-
-  const spendingQuery = (await db.execute(
-    sql`
-      SELECT
-        DATE_TRUNC('month', t.date) AS month,
-        SUM(CAST(t.amount AS NUMERIC)) AS amount
-      FROM
-        transactions t
-      WHERE
-        t.user_id = ${user.user.id}
-        AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
-        AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-        AND t.transaction_id IN (
-          SELECT DISTINCT tl.transaction_id
-          FROM tags_link_new tl
-          JOIN tags_v2 tv ON tl.tag_id = tv.id
-          WHERE tv.tag NOT IN ('income', 'transfer')
-        )
-      GROUP BY
-        DATE_TRUNC('month', t.date);
-    `
-  )) as {
-    rows: { month: string; amount: string }[];
-  };
-  const spendingForMonth = spendingQuery.rows?.[0]?.amount;
-
-  const spendingForMonthInt = parseInt(spendingForMonth ?? "", 10);
-  return (
-    <div>
-      Actual net spending (non estimated expenses): {spendingForMonthInt}; total
-      remaining: {estimatedIncomeForPeriod - spendingForMonthInt}
-    </div>
-  );
-}
-
 async function Expenses({
   estimatedIncomeForPeriod,
 }: {
@@ -419,7 +450,7 @@ async function Expenses({
   );
   return (
     <div>
-      target: {targetSpending}, actual: {expensesForPeriod}, diff:{" "}
+      target expenses: {targetSpending}, actual: {expensesForPeriod}, diff:{" "}
       {targetSpending - expensesForPeriod}
     </div>
   );
@@ -547,17 +578,16 @@ async function Income({
     },
     0
   );
-  const unspent = estIncome - estExpenses - trackedSpending;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-5">
-        <div className="flex gap-10 w-full">
+        <div className="flex gap-10 w-full flex-wrap">
           <Label text="Est. Income">
             <span>${estIncome}</span>
           </Label>
           <Label text="Est. Expenses">-${estExpenses}</Label>
-          <Label text="To allocate">
+          <Label text="Non defense discretionary">
             <span>${estIncome - estExpenses}</span>
           </Label>
         </div>
@@ -593,9 +623,6 @@ async function Income({
             })}
           </div>
         </div>
-        <Label text={"Unspent"}>
-          <span className=" ">${Math.round(unspent)}</span>
-        </Label>
       </div>
     </div>
   );

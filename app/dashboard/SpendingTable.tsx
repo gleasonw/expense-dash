@@ -14,7 +14,6 @@ const columns = [
   "date",
   "name",
   "amount",
-  "merchant_name",
 ] as const satisfies (keyof Transaction)[];
 
 function rendererForColumn(
@@ -109,7 +108,10 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
         <TransactionCategorizer transaction={transaction} />
       </td>
       {columns.map((column) => (
-        <td key={`${transaction.transaction_id}-${column}`}>
+        <td
+          key={`${transaction.transaction_id}-${column}`}
+          className="text-right"
+        >
           {/* Handle different data types and potential null values */}
           {rendererForColumn(column, transaction as TransactionWithTags)}
         </td>
