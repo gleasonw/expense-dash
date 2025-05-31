@@ -268,6 +268,7 @@ async function NetSpendingByMonth() {
       net_amount: string;
     }[];
   };
+  console.log({ netSpend });
   return (
     <div className="flex flex-wrap gap-5">
       {netSpend?.rows
