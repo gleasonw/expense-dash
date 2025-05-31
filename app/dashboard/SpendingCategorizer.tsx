@@ -11,7 +11,6 @@ export function SpendingCategorizer({
   if (transactionsWithoutTag.length === 0) {
     return <div>No transactions to categorize</div>;
   }
-  console.log(transactionsWithoutTag, "transactionsWithoutTag");
   return (
     <div className="flex flex-wrap gap-10">
       {transactionsWithoutTag.map((transaction) => (
