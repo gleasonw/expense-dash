@@ -268,10 +268,11 @@ async function NetSpendingByMonth() {
       net_amount: string;
     }[];
   };
-  console.log({ netSpend });
+  const rows = netSpend.rows;
+  console.log({ test: rows });
   return (
     <div className="flex flex-wrap gap-5">
-      {netSpend?.rows
+      {rows
         ?.toSorted(
           (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime()
         )
