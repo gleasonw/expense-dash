@@ -185,6 +185,7 @@ export default async function Dashboard({
         </button>
       </div>
       <TargetForTagPicker />
+      {/**@ts-ignore */}
       <div className={style.chart}>
         <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
       </div>
@@ -577,17 +578,6 @@ async function Income({
 
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
   const estExpenses = parseInt(expenses?.[0].amount ?? "0", 10);
-  const trackedSpendingByKind = R.pick(currentPeriodSpendingByTag, toTrack);
-  const trackedSpending = Object.values(trackedSpendingByKind).reduce(
-    (acc, v) => {
-      const currentSpending = parseInt(v.amount ?? "0");
-      if (isNaN(currentSpending)) {
-        return acc;
-      }
-      return acc + currentSpending;
-    },
-    0
-  );
 
   return (
     <div className="flex flex-col gap-4">
