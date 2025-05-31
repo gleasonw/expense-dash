@@ -188,9 +188,9 @@ export default async function Dashboard({
         <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
       </div>
 
-      <div className="flex">
+      <div className="flex flex-wrap">
         <div className="flex flex-col gap-10 p-3">
-          <div className="bg-gray-100 rounded-lg pg-3 max-w-[600px]">
+          <div className="flex flex-col bg-gray-100 rounded-lg pg-3 max-w-[600px]">
             <Income taggedSpendingByPeriod={spendingByMonth.rows} />
             <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
           </div>
@@ -200,10 +200,39 @@ export default async function Dashboard({
           <HowMuchDidISpendOnTag />
         </div>
 
-        <div className="w-full">
+        <div className="w-full hidden sm:flex flex-col">
           <TagMaker />
           <TransactionFilters />
           <SpendingTable rows={tsMerged} />
+        </div>
+        <div className="w-full flex sm:hidden flex-col">
+          <TransactionFilters />
+          {tsMerged.map((t) => (
+            <div
+              key={t.transaction_id}
+              className="p-3 border-b hover:bg-gray-100"
+            >
+              <span className="font-semibold">{t.name}</span>
+              <span className="text-gray-600">
+                {" "}
+                - {formatCurrency(t.amount)}
+              </span>
+              <span className="text-gray-500">
+                {" "}
+                - {new Date(t.date).toLocaleDateString()}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {t.tags.map((tag) => (
+                  <span
+                    key={tag.tag}
+                    className="bg-blue-200 text-blue-800 px-2 py-1 rounded-md"
+                  >
+                    {tag.tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -575,49 +604,45 @@ async function Income({
   const estExpenses = parseInt(expenses?.[0].amount ?? "0", 10);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-5">
-        <div className="flex gap-10 w-full flex-wrap">
-          <Label text="Est. Income">
-            <span>${estIncome}</span>
-          </Label>
-          <Label text="Est. Expenses">-${estExpenses}</Label>
-          <Label text="Non defense discretionary">
-            <span>${estIncome - estExpenses}</span>
-          </Label>
-        </div>
-        <div className="flex gap-5">
-          <div className="flex gap-10 flex-wrap">
-            {toTrack.map((kind) => {
-              const targetSpending = (targets[kind] / 100) * estIncome;
-              const currentSpending = parseInt(
-                currentPeriodSpendingByTag[kind]?.amount ?? "0"
-              );
-              return (
-                <div
-                  className="flex border shadow-lg p-3 gap-5 flex-col bg-white"
-                  key={kind}
-                >
-                  <Label text={labelForKind[kind]} className="text-lg">
-                    (${Math.round(targetSpending)}) -
-                    {isNaN(currentSpending) ? "$0" : `$${currentSpending}`}
-                  </Label>
-                  <Label text="To spend" className="text-3xl">
-                    {isNaN(currentSpending) ? (
-                      <span className="text-right">
-                        ${targetSpending.toFixed(2)}
-                      </span>
-                    ) : (
-                      <span className="text-right">
-                        ${Math.round(targetSpending - currentSpending)}
-                      </span>
-                    )}
-                  </Label>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+    <div className="flex flex-col gap-5">
+      <div className="flex gap-3 flex-wrap">
+        <Label text="Est. Income">
+          <span>${estIncome}</span>
+        </Label>
+        <Label text="Est. Expenses">-${estExpenses}</Label>
+        <Label text="Non defense discretionary">
+          <span>${estIncome - estExpenses}</span>
+        </Label>
+      </div>
+      <div className="flex gap-5 flex-wrap">
+        {toTrack.map((kind) => {
+          const targetSpending = (targets[kind] / 100) * estIncome;
+          const currentSpending = parseInt(
+            currentPeriodSpendingByTag[kind]?.amount ?? "0"
+          );
+          return (
+            <div
+              className="flex border shadow-lg p-3 gap-5 flex-col bg-white"
+              key={kind}
+            >
+              <Label text={labelForKind[kind]} className="text-lg">
+                (${Math.round(targetSpending)}) -
+                {isNaN(currentSpending) ? "$0" : `$${currentSpending}`}
+              </Label>
+              <Label text="To spend" className="text-3xl">
+                {isNaN(currentSpending) ? (
+                  <span className="text-right">
+                    ${targetSpending.toFixed(2)}
+                  </span>
+                ) : (
+                  <span className="text-right">
+                    ${Math.round(targetSpending - currentSpending)}
+                  </span>
+                )}
+              </Label>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

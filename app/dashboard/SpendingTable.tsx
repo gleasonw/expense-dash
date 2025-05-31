@@ -44,57 +44,31 @@ export const SpendingTable = observer(function QueryResults({
 }: {
   rows: TransactionWithTags[];
 }) {
-  const firstRow = rows[0];
-
-  const resultsAreTransactions = firstRow && "transaction_id" in firstRow;
-
   const appStore = useContext(AppStoreContext);
 
   if (!appStore) {
     return null;
   }
 
-  if (resultsAreTransactions) {
-    const grouped = R.groupBy(rows, (t) => t.account_id);
-
-    return Object.entries(grouped).map(([accountId, transactions]) => (
-      <div key={accountId} className="w-full">
-        <table className="w-full">
-          <thead>
-            <tr>
-              <th>Tags</th>
-              {columns.map((column) => (
-                <th key={column}>{column}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="space-y-4">
-            {transactions.map((transaction) => (
-              <TransactionRow
-                transaction={transaction}
-                key={transaction.transaction_id}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    ));
-  }
-
-  // just render key: val
   return (
-    <div className="flex flex-col">
-      <span className="text-red-500">
-        {" "}
-        TODO: add in direct sql queries, option to save /name views, default
-        view, etc
-      </span>
-      {rows.map((item) => (
-        <div className="flex flex-col" key={item.transaction_id}>
-          <DisplayUnknownObject obj={item} />
-        </div>
-      ))}
-    </div>
+    <table className="w-full">
+      <thead>
+        <tr>
+          <th>Tags</th>
+          {columns.map((column) => (
+            <th key={column}>{column}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="space-y-4">
+        {rows.map((transaction) => (
+          <TransactionRow
+            transaction={transaction}
+            key={transaction.transaction_id}
+          />
+        ))}
+      </tbody>
+    </table>
   );
 });
 
