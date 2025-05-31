@@ -11,8 +11,11 @@ export function toAppTransaction(
   })) as AppTransaction[];
 }
 
-export const formatCurrency = (value: string) => {
-  const roundedValue = Math.round(parseInt(value, 10));
+export const formatCurrency = (value: number | string) => {
+  const roundedValue =
+    typeof value === "number"
+      ? Math.round(value * 100) / 100
+      : Math.round(parseFloat(value) * 100) / 100;
   // Handle potential NaN if parsing fails
   if (isNaN(roundedValue)) {
     return "$--"; // Or some other placeholder
