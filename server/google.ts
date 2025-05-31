@@ -6,7 +6,9 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   );
 }
 
-console.log(process.env.RAILWAY_PUBLIC_DOMAIN);
+console.log({
+  redirectUri: `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/login/google/callback`,
+});
 
 export const google = new Google(
   process.env.GOOGLE_CLIENT_ID,
@@ -15,5 +17,5 @@ export const google = new Google(
     ? "http://localhost:3000/login/google/callback"
     : // need to update in google cloud console auth client if this changes...
       // could i use pulumi?
-      `${process.env.RAILWAY_PUBLIC_DOMAIN}/login/google/callback`
+      `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/login/google/callback`
 );
