@@ -133,8 +133,6 @@ export default async function Dashboard({
     )
     .orderBy(desc(transactions.date));
 
-  console.log(ts);
-
   const tsMerged = Object.values(
     R.groupBy(ts, (t) => t.transactions.transaction_id)
   ).map((tagsForTransaction) => {
@@ -270,7 +268,6 @@ async function NetSpendingByMonth() {
       net_amount: string;
     }[];
   };
-  console.log(netSpend.rows);
   return (
     <div className="flex flex-wrap gap-5">
       {netSpend.rows

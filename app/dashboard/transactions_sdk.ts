@@ -70,7 +70,6 @@ export async function autoTagTransactions(
         eq(auto_tag_merchants_new.user_id, userWithAccount.user.id)
       )
     );
-  console.log({ autoTags });
 
   const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
   const transactionsToAutotag = ts.reduce((acc, t) => {
@@ -81,7 +80,6 @@ export async function autoTagTransactions(
     acc.push({ transaction_id: t.transaction_id, tag_id: autoTag.tag_id });
     return acc;
   }, [] as { transaction_id: string; tag_id: string }[]);
-  console.log({ transactionsToAutotag });
   const autoTagged = await db
     .insert(tagsLinkNew)
     .values(
