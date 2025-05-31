@@ -185,7 +185,7 @@ export default async function Dashboard({
         </button>
       </div>
       <TargetForTagPicker />
-      {/**@ts-ignore */}
+      {/**@ts-expect-error css modules are a pain with ts */}
       <div className={style.chart}>
         <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
       </div>
@@ -277,7 +277,7 @@ async function NetSpendingByMonth() {
         .toSorted(
           (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime()
         )
-        .map((r, i) => {
+        .map((r) => {
           // Parse amounts once for clarity and safety
           const income = parseInt(r.total_income, 10) || 0;
           const spending = parseInt(r.total_spending, 10) || 0;
