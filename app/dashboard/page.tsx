@@ -272,61 +272,57 @@ async function NetSpendingByMonth() {
   console.log({ test: rows });
   return (
     <div className="flex flex-wrap gap-5">
-      {rows
-        ?.toSorted(
-          (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime()
-        )
-        .map((r) => {
-          // Parse amounts once for clarity and safety
-          const income = parseInt(r.total_income, 10) || 0;
-          const spending = parseInt(r.total_spending, 10) || 0;
-          const net = parseInt(r.net_amount, 10) || 0;
+      {rows.map((r) => {
+        // Parse amounts once for clarity and safety
+        const income = parseInt(r.total_income, 10) || 0;
+        const spending = parseInt(r.total_spending, 10) || 0;
+        const net = parseInt(r.net_amount, 10) || 0;
 
-          // Determine the color class based on the net amount
-          const netColorClass =
-            net > 0
-              ? "text-green-600" // Surplus
-              : net < 0
-              ? "text-red-600" // Deficit
-              : "text-black"; // Zero or default
+        // Determine the color class based on the net amount
+        const netColorClass =
+          net > 0
+            ? "text-green-600" // Surplus
+            : net < 0
+            ? "text-red-600" // Deficit
+            : "text-black"; // Zero or default
 
-          return (
-            <div
-              key={r.month} // Assuming r.month is unique and stable (like '2023-10-01T00:00:00.000Z')
-              className="flex w-48 flex-col gap-2 rounded border bg-white p-4 shadow-lg" // Added width, rounded corners, adjusted gap/padding
-            >
-              {/* Format the month nicely */}
-              <span className="mb-2 text-center font-semibold text-gray-700">
-                {new Date(r.month).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  timeZone: "UTC",
-                })}
+        return (
+          <div
+            key={r.month} // Assuming r.month is unique and stable (like '2023-10-01T00:00:00.000Z')
+            className="flex w-48 flex-col gap-2 rounded border bg-white p-4 shadow-lg" // Added width, rounded corners, adjusted gap/padding
+          >
+            {/* Format the month nicely */}
+            <span className="mb-2 text-center font-semibold text-gray-700">
+              {new Date(r.month).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                timeZone: "UTC",
+              })}
+            </span>
+            <Label text={"Income"} className="text-md">
+              {" "}
+              {/* Adjusted size */}
+              <span className="text-right font-medium">
+                {formatCurrency(income)}
               </span>
-              <Label text={"Income"} className="text-md">
-                {" "}
-                {/* Adjusted size */}
-                <span className="text-right font-medium">
-                  {formatCurrency(income)}
-                </span>
-              </Label>
-              <Label text={"Spending"} className="text-md">
-                <span className="text-right font-medium">
-                  {formatCurrency(spending)}
-                </span>
-              </Label>
-              <hr className="my-1" /> {/* Optional separator */}
-              <Label text={"Net"} className="text-md font-semibold">
-                {" "}
-                {/* Make Net label bold */}
-                {/* Apply the conditional color class */}
-                <span className={`text-right font-bold ${netColorClass}`}>
-                  {formatCurrency(net)}
-                </span>
-              </Label>
-            </div>
-          );
-        })}
+            </Label>
+            <Label text={"Spending"} className="text-md">
+              <span className="text-right font-medium">
+                {formatCurrency(spending)}
+              </span>
+            </Label>
+            <hr className="my-1" /> {/* Optional separator */}
+            <Label text={"Net"} className="text-md font-semibold">
+              {" "}
+              {/* Make Net label bold */}
+              {/* Apply the conditional color class */}
+              <span className={`text-right font-bold ${netColorClass}`}>
+                {formatCurrency(net)}
+              </span>
+            </Label>
+          </div>
+        );
+      })}
     </div>
   );
 }
