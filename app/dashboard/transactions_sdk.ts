@@ -7,16 +7,8 @@ import {
   transactions,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import {
-  and,
-  inArray,
-  eq,
-  or,
-  notInArray,
-  InferSelectModel,
-} from "drizzle-orm";
+import { and, inArray, eq, or, notInArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { Transaction } from "plaid";
 import * as R from "remeda";
 
 export async function tryAutoTagTransactions() {

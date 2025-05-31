@@ -1,5 +1,4 @@
 import { AppTransaction } from "@/app/dashboard/types";
-import { getUserWithToken } from "@/server/session";
 import { Transaction } from "plaid";
 
 /**annoying drizzle parsing numbers to strings for postgres precision reasons */
@@ -12,7 +11,7 @@ export function toAppTransaction(
   })) as AppTransaction[];
 }
 
-export const formatCurrency = (value) => {
+export const formatCurrency = (value: string) => {
   const roundedValue = Math.round(parseInt(value, 10));
   // Handle potential NaN if parsing fails
   if (isNaN(roundedValue)) {

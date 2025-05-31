@@ -17,7 +17,7 @@ import {
   tagsLinkNew,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { eq, sql, and, inArray, desc } from "drizzle-orm";
+import { eq, sql, and, desc } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
