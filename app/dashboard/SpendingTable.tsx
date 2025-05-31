@@ -8,7 +8,6 @@ import {
   addTagToTransaction_v2,
   removeTagFromTransaction,
 } from "@/app/dashboard/actions";
-import * as R from "remeda";
 
 const columns = [
   "date",
@@ -145,21 +144,6 @@ export function TransactionCategorizer({
           onChange={(e) => setAutoTagTransaction(e.target.checked)}
         />
       </label>
-    </div>
-  );
-}
-
-function DisplayUnknownObject({ obj }: { obj: unknown }) {
-  if (obj === undefined || obj === null) {
-    return <div>null</div>;
-  }
-  return (
-    <div className="flex flex-col pl-5">
-      {Object.entries(obj).map(([key, val], i) => (
-        <div key={`${key}-${i}`}>
-          {key}: {JSON.stringify(val)}
-        </div>
-      ))}
     </div>
   );
 }
