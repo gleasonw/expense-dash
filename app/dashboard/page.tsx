@@ -9,15 +9,9 @@ import { SpendingTable } from "@/app/dashboard/SpendingTable";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
 import * as style from "@/app/dashboard/dashboard.module.css";
-import {
-  userTable,
-  transactions,
-  tagAllocations,
-  tags_new,
-  tagsLinkNew,
-} from "@/server/schema";
+import { userTable, tagAllocations, tags_new } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { eq, sql, and, desc } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
@@ -25,6 +19,7 @@ import { SpendChecker } from "@/app/dashboard/SpendChecker";
 import Link from "next/link";
 import {
   autoTagTransactions,
+  getTransactionsWithTags,
   tryAutoTagTransactions,
 } from "@/app/dashboard/transactions_sdk";
 import {
@@ -32,6 +27,11 @@ import {
   toAppTransaction,
 } from "@/app/dashboard/transaction_utils";
 import { Suspense } from "react";
+import {
+  getIncomeByMonth,
+  getNetSpendingByMonth,
+  getSpendingByMonth,
+} from "@/app/dashboard/aggregates";
 
 // TODO
 // override dates, so you can put a charge towards next month's budget
@@ -80,96 +80,13 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  // todo: make these fetches concurrent
-  const spendingByMonth = (await db.execute(
-    sql`
-      SELECT
-          DATE_TRUNC('month', t.date) AS month,
-          SUM(CAST(t.amount AS NUMERIC)) AS amount,
-          tv.tag,
-          CASE
-              WHEN DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE)
-              THEN TRUE
-              ELSE FALSE
-          END AS is_current_month
-      FROM
-          transactions t
-      JOIN
-          tags_link_new tl ON t.transaction_id = tl.transaction_id
-      JOIN
-          tags_v2 tv ON tl.tag_id = tv.id
-      WHERE
-          t.user_id = ${userWithAccount.user.id}
-          AND tv.tag not in ('income', 'transfer')
-      GROUP BY
-          DATE_TRUNC('month', t.date), tv.id
-      ORDER BY
-          month;
-    `
-  )) as {
-    rows: {
-      month: string;
-      amount: string;
-      tag: string;
-      is_current_month: boolean;
-    }[];
-  };
-
-  const ts = await db
-    .select()
-    .from(transactions)
-    .leftJoin(
-      tagsLinkNew,
-      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
-    )
-    .leftJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
-    .where(
-      filterByTag
-        ? and(
-            eq(transactions.user_id, userWithAccount.user.id),
-            eq(tags_new.tag, filterByTag)
-          )
-        : eq(transactions.user_id, userWithAccount.user.id)
-    )
-    .orderBy(desc(transactions.date), transactions.merchant_name);
-
-  const tsMerged = Object.values(
-    R.groupBy(ts, (t) => t.transactions.transaction_id)
-  ).map((tagsForTransaction) => {
-    const baseTransaction = tagsForTransaction[0].transactions;
-    const tags = tagsForTransaction
-      .map((t) => t.tags_v2)
-      .filter((t) => t !== null);
-    return {
-      ...baseTransaction,
-      tags,
-    };
-  });
-
-  const incomeQuery = (await db.execute(
-    sql`
-    SELECT
-      DATE_TRUNC('month', t.date) AS month,
-      SUM(CAST(t.amount AS NUMERIC)) AS amount,
-      tv.tag
-    FROM
-        transactions t
-    JOIN
-        tags_link_new tl ON t.transaction_id = tl.transaction_id
-    JOIN
-        tags_v2 tv ON tl.tag_id = tv.id
-    WHERE
-        t.user_id = ${userWithAccount.user.id}
-        AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
-        AND tv.tag = 'income'
-    GROUP BY
-        DATE_TRUNC('month', t.date), tv.tag
-    ORDER BY
-        month;
-`
-  )) as { rows: { month: string; amount: string; tag: string }[] };
+  const [spendingByMonth, tsMerged, incomeQuery] = await Promise.all([
+    getSpendingByMonth(),
+    getTransactionsWithTags({ tag: filterByTag }),
+    getIncomeByMonth(),
+  ]);
   const estIncomeForPeriod = Math.round(
-    parseInt(incomeQuery.rows?.[0]?.amount ?? "", 10) * -1
+    parseInt(incomeQuery?.rows?.[0]?.amount ?? "", 10) * -1
   );
 
   return (
@@ -244,61 +161,7 @@ async function NetSpendingByMonth() {
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
-  const netSpend = (await db.execute(`
-     WITH monthly_income AS (
-      -- Calculate total income per month
-      SELECT
-        DATE_TRUNC('month', t.date) AS month,
-        SUM(CAST(t.amount AS NUMERIC)) * -1 AS total_income
-      FROM
-        transactions t
-      JOIN tags_link_new tl ON t.transaction_id = tl.transaction_id
-      JOIN tags_v2 tv ON tl.tag_id = tv.id
-      WHERE
-        t.user_id = ${user.user.id}
-        AND tv.tag = 'income' -- Only include transactions tagged as 'income'
-      GROUP BY
-        DATE_TRUNC('month', t.date)
-    ), monthly_spending AS (
-      -- Calculate total spending per month (your original query logic)
-      SELECT
-        DATE_TRUNC('month', t.date) AS month,
-        SUM(CAST(t.amount AS NUMERIC)) AS total_spending
-      FROM
-        transactions t
-      WHERE
-        t.user_id = ${user.user.id}
-        AND t.transaction_id IN (
-          SELECT DISTINCT tl.transaction_id
-          FROM tags_link_new tl
-          JOIN tags_v2 tv ON tl.tag_id = tv.id
-          WHERE tv.tag NOT IN ('income', 'transfer') -- Exclude income & transfers
-        )
-      GROUP BY
-        DATE_TRUNC('month', t.date)
-    )
-    -- Combine income and spending, calculate net
-    SELECT
-      COALESCE(mi.month, ms.month) AS month, -- Use COALESCE in case a month has only income or only spending
-      COALESCE(mi.total_income, 0) AS total_income,
-      COALESCE(ms.total_spending, 0) AS total_spending,
-      (COALESCE(mi.total_income, 0) - COALESCE(ms.total_spending, 0)) AS net_amount
-    FROM
-      monthly_income mi
-    FULL OUTER JOIN -- Use FULL OUTER JOIN to include months with only income or only spending
-      monthly_spending ms ON mi.month = ms.month
-    ORDER BY
-      month ASC;
-`)) as {
-    rows: {
-      month: string;
-      total_income: string;
-      total_spending: string;
-      net_amount: string;
-    }[];
-  };
-  const rows = netSpend.rows;
-  console.log({ test: rows });
+  const { rows } = await getNetSpendingByMonth();
   return (
     <div className="grid grid-cols-2 md:flex gap-3 flex-wrap">
       {rows
@@ -389,35 +252,15 @@ async function HowMuchDidISpendOnTag() {
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
-  const spendingByTagLastMonth = (await db.execute(
-    sql`
-    SELECT
-        DATE_TRUNC('month', t.date) AS month,
-        SUM(CAST(t.amount AS NUMERIC)) AS amount,
-        tv.tag,
-        tv.id as tag_id
-    FROM
-        transactions t
-    JOIN
-        tags_link_new tln ON t.transaction_id = tln.transaction_id
-    JOIN
-        tags_v2 tv ON tln.tag_id = tv.id
-    WHERE
-        t.user_id = ${user.user.id}
-        AND tv.tag not in ('income', 'transfer')
-        AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
-    GROUP BY
-        DATE_TRUNC('month', t.date), tv.tag, tv.id
-    ORDER BY
-        month;
-    `
-  )) as {
-    rows: { month: string; amount: string; tag: string; tag_id: string }[];
-  };
+  const spendingByTag = await getSpendingByMonth();
+  // TODO: maybe allow us to filter down to a specific month in the sdk
+  const spendingByTagLastMonth = spendingByTag.rows.filter(
+    (t) => t.is_current_month
+  );
 
   return (
     <>
-      <SpendChecker spending={spendingByTagLastMonth.rows} />
+      <SpendChecker spending={spendingByTagLastMonth} />
     </>
   );
 }
@@ -497,7 +340,7 @@ async function Expenses({
   );
 }
 
-async function TargetForTagPicker() {
+export async function TargetForTagPicker() {
   const allTags = await db.query.tags.findMany({ with: { allocation: true } });
   const tags = allTags.filter(
     (t) => t.tag !== "income" && t.tag !== "transfer"
