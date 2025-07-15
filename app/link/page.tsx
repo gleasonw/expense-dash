@@ -4,7 +4,13 @@ import { CountryCode, Products } from "plaid";
 
 export default async function Link() {
   if (!process.env.PLAID_CLIENT_ID) {
-    return "check server";
+    return "check server, no plaid client id";
+  }
+  if (!process.env.PLAID_SECRET) {
+    return "check server, no plaid secret";
+  }
+  if (!process.env.PLAID_REDIRECT_URI) {
+    return "check server, no plaid redirect uri";
   }
   let tokenResponse;
   try {
@@ -17,13 +23,15 @@ export default async function Link() {
       redirect_uri: process.env.PLAID_REDIRECT_URI,
     });
   } catch (e) {
+    console.log(process.env);
+    console.log(e.response);
     if (e instanceof Error) {
       console.log(e.message);
     }
   }
 
   if (!tokenResponse) {
-    return "check server";
+    return "check server, no token response";
   }
 
   return <PlaidLinkComponent link_token={tokenResponse.data.link_token} />;

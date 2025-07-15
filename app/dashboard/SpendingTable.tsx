@@ -1,6 +1,6 @@
 "use client";
 import { Transaction } from "plaid";
-import { useContext, useState } from "react";
+import { useActionState, useContext, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { AppStoreContext, TagsContext } from "@/app/dashboard/Providers";
 import { TransactionWithTags } from "@/server/schema";
@@ -99,10 +99,17 @@ export function TransactionCategorizer({
   transaction: TransactionWithTags;
 }) {
   const tags = useContext(TagsContext);
-  const [autoTagTransaction, setAutoTagTransaction] = useState(false);
+  const [tagState, addTagToTransaction, addTagPending] = useActionState(
+    addTagToTransaction_v2,
+    {
+      tagId: transaction.tags?.at(0)?.id ?? "",
+      transactionId: transaction.transaction_id,
+      autoTag: true,
+    }
+  );
 
   return (
-    <div className="flex gap-2 flex-col">
+    <form className="flex gap-2 flex-col">
       <div className="flex flex-wrap gap-1">
         {transaction.tags.map((t) => (
           <button
@@ -119,16 +126,12 @@ export function TransactionCategorizer({
           </button>
         ))}
       </div>
-      <select
-        value={transaction.tags?.at(0)?.id ?? ""}
-        onChange={(e) => {
-          addTagToTransaction_v2({
-            tagId: e.target.value,
-            transactionId: transaction.transaction_id,
-            autoTag: autoTagTransaction,
-          });
-        }}
-      >
+      <input
+        type="hidden"
+        name="transactionId"
+        value={transaction.transaction_id}
+      />
+      <select name="tagId">
         {tags?.map((t) => (
           <option key={t.tag} value={t.id}>
             {t.tag}
@@ -138,12 +141,15 @@ export function TransactionCategorizer({
       </select>
       <label>
         Autotag
-        <input
-          type="checkbox"
-          checked={autoTagTransaction}
-          onChange={(e) => setAutoTagTransaction(e.target.checked)}
-        />
+        <input type="checkbox" name="autoTag" />
       </label>
-    </div>
+      <button
+        className="border hover:bg-gray-100"
+        formAction={addTagToTransaction}
+        disabled={addTagPending}
+      >
+        Add tag
+      </button>
+    </form>
   );
 }

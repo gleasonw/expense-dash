@@ -13,6 +13,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { Transaction } from "plaid";
+import { parseWithZod } from "@conform-to/zod/v4";
+import { z } from "zod";
 
 export async function removeTagFromTransaction({
   transactionId,
@@ -104,19 +106,33 @@ export async function addTransactions(
     .onConflictDoNothing();
 }
 
-export async function addTagToTransaction_v2({
-  transactionId,
-  tagId,
-  autoTag,
-}: {
+type AddTagState = {
   transactionId: string;
   tagId: string;
   autoTag: boolean;
-}) {
+};
+
+export async function addTagToTransaction_v2(
+  initialState: AddTagState,
+  formData: FormData
+) {
+  console.log({ initialState, formData });
+  const submission = parseWithZod(formData, {
+    schema: z.object({
+      transactionId: z.string(),
+      tagId: z.string(),
+      autoTag: z.coerce.boolean().optional().default(false),
+    }),
+  });
+  if (submission.status !== "success") {
+    console.error("Form parsing error:", submission);
+    return submission.reply();
+  }
+  const data = submission.value;
   console.log("adding tag to transaction", {
-    transactionId,
-    tagId,
-    autoTag,
+    transactionId: data.transactionId,
+    tagId: data.tagId,
+    autoTag: data.autoTag,
   });
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
@@ -125,12 +141,15 @@ export async function addTagToTransaction_v2({
   }
   const [fullTag, fullTransaction] = await Promise.all([
     db.query.tags_new.findFirst({
-      where: and(eq(tags_new.userId, user.user.id), eq(tags_new.id, tagId)),
+      where: and(
+        eq(tags_new.userId, user.user.id),
+        eq(tags_new.id, data.tagId)
+      ),
     }),
     db.query.transactions.findFirst({
       where: and(
         eq(transactions.user_id, user.user.id),
-        eq(transactions.transaction_id, transactionId)
+        eq(transactions.transaction_id, data.transactionId)
       ),
     }),
   ]);
@@ -156,4 +175,9 @@ export async function addTagToTransaction_v2({
     });
   }
   revalidatePath("/dashboard");
+  return {
+    transactionId: transactionId,
+    tagId: tagId,
+    autoTag: autoTag,
+  };
 }
