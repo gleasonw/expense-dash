@@ -113,6 +113,7 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MakeSync<T> = T extends (...args: any[]) => Promise<infer R>
   ? (...args: Parameters<T>) => R
   : T;
