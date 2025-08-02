@@ -83,12 +83,19 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
         {transaction.tags?.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {transaction.tags.map((tag) => (
-              <span
+              <button
                 key={tag.id}
-                className="bg-gray-200 text-gray-800 px-2 py-1 rounded-md"
+                onClick={() =>
+                  removeTagFromTransaction({
+                    transactionId: transaction.transaction_id,
+                    tagId: tag.id,
+                  })
+                }
+                className="bg-gray-200 text-gray-800 px-2 py-1 rounded-md flex justify-between"
               >
                 {tag.tag}
-              </span>
+                <span>X</span>
+              </button>
             ))}
           </div>
         ) : null}
