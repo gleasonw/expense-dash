@@ -197,6 +197,43 @@ export const sessionTable = pgTable("session", {
   }).notNull(),
 });
 
+export const savingsBuckets = pgTable("savings_buckets", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id")
+    .notNull()
+    .references(() => userTable.id),
+  name: text("name").notNull(),
+  target_amount: decimal("target_amount").notNull(),
+  current_amount: decimal("current_amount").notNull(),
+  created_at: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  }).notNull(),
+  updated_at: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "date",
+  }).notNull(),
+});
+
+export const savingsAllocations = pgTable("savings_allocations", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id")
+    .notNull()
+    .references(() => userTable.id),
+  bucket_id: integer("bucket_id")
+    .notNull()
+    .references(() => savingsBuckets.id),
+  allocation: decimal("allocation").notNull(),
+  created_at: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  }).notNull(),
+  updated_at: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "date",
+  }).notNull(),
+});
+
 export const plaidAccount = pgTable("plaid_account", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id")
