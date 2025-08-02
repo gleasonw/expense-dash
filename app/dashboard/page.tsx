@@ -334,7 +334,7 @@ async function Expenses({
   );
 }
 
-export async function TargetForTagPicker() {
+async function TargetForTagPicker() {
   const allTags = await db.query.tags.findMany({ with: { allocation: true } });
   const tags = allTags.filter(
     (t) => t.tag !== "income" && t.tag !== "transfer"
