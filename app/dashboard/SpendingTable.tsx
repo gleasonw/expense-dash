@@ -6,8 +6,10 @@ import { AppStoreContext, TagsContext } from "@/app/dashboard/Providers";
 import { TransactionWithTags } from "@/server/schema";
 import {
   addTagToTransaction_v2,
+  FormTagTransactionState,
   removeTagFromTransaction,
 } from "@/app/dashboard/actions";
+import { idForTagTransaction } from "@/app/dashboard/transaction_utils";
 
 const columns = [
   "date",
@@ -78,7 +80,18 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
       className="border-spacing-5 border-2 odd:bg-gray-100"
     >
       <td className="p-3">
-        <TransactionCategorizer transaction={transaction} />
+        {transaction.tags?.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {transaction.tags.map((tag) => (
+              <span
+                key={tag.id}
+                className="bg-gray-200 text-gray-800 px-2 py-1 rounded-md"
+              >
+                {tag.tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </td>
       {columns.map((column) => (
         <td
@@ -93,49 +106,61 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
   );
 }
 
+type MakeSync<T> = T extends (...args: any[]) => Promise<infer R>
+  ? (...args: Parameters<T>) => R
+  : T;
+
 export function TransactionCategorizer({
   transaction,
+  removeTag,
+  addTag,
+  tagState,
 }: {
   transaction: TransactionWithTags;
+  removeTag: MakeSync<typeof removeTagFromTransaction>;
+  addTag: MakeSync<typeof addTagToTransaction_v2>;
+  tagState: FormTagTransactionState;
 }) {
   const tags = useContext(TagsContext);
   const [autoTagTransaction, setAutoTagTransaction] = useState(false);
 
   return (
     <div className="flex gap-2 flex-col">
-      <div className="flex flex-wrap gap-1">
-        {transaction.tags.map((t) => (
-          <button
-            key={t.tag}
-            className="bg-blue-200 text-blue-800 px-2 py-1 rounded-md hover:bg-blue-300"
-            onClick={() => {
-              removeTagFromTransaction({
-                transactionId: transaction.transaction_id,
-                tagId: t.id,
-              });
-            }}
-          >
-            {t.tag}
-          </button>
-        ))}
-      </div>
-      <select
-        value={transaction.tags?.at(0)?.id ?? ""}
-        onChange={(e) => {
-          addTagToTransaction_v2({
-            tagId: e.target.value,
+      <div className="flex flex-wrap gap-3">
+        {tags?.map((t) => {
+          const id = idForTagTransaction({
             transactionId: transaction.transaction_id,
-            autoTag: autoTagTransaction,
+            tagId: t.id,
           });
-        }}
-      >
-        {tags?.map((t) => (
-          <option key={t.tag} value={t.id}>
-            {t.tag}
-          </option>
-        ))}
-        <option value="">None</option>
-      </select>
+          const tagIsSelectedForTransaction = tagState[id];
+          return (
+            <button
+              key={t.id}
+              className={`bg-gray-200 text-gray-800 px-2 py-1 rounded-md hover:cursor-pointer ${
+                tagIsSelectedForTransaction ? "bg-green-500 outline" : ""
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+
+                if (tagIsSelectedForTransaction) {
+                  removeTag({
+                    transactionId: transaction.transaction_id,
+                    tagId: t.id,
+                  });
+                } else {
+                  addTag({
+                    transactionId: transaction.transaction_id,
+                    tagId: t.id,
+                    autoTag: autoTagTransaction,
+                  });
+                }
+              }}
+            >
+              {t.tag}
+            </button>
+          );
+        })}
+      </div>
       <label>
         Autotag
         <input

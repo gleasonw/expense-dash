@@ -34,15 +34,9 @@ import {
 } from "@/app/dashboard/aggregates";
 
 // TODO
-// override dates, so you can put a charge towards next month's budget
-// monthly spending by category table view (choose tags)
-// why is the sorting so strange? why would adding a tag change sorting?
-
-// bind data more directly to components... don't pass it down just to avoid duplicate queries...
-// that should be solved by the db layer
-
-// TODO: dan abramov suggestion: to get optimistic updates, have a top-level provider,
-// have components subscribe to optimistic updates...
+// - multiple buttons for each tag beneath every new transaction -- bim bang boom, then submit all at once
+// - fix auto tag transaction bug
+// - savings buckets
 
 export default async function Dashboard({
   searchParams,

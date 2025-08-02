@@ -13,6 +13,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { Transaction } from "plaid";
+import { tagIdAndTransactionIdFromId } from "@/app/dashboard/transaction_utils";
 
 export async function removeTagFromTransaction({
   transactionId,
@@ -102,6 +103,38 @@ export async function addTransactions(
       }))
     )
     .onConflictDoNothing();
+}
+
+export type TransactionTagId = string & { __tagId: never };
+
+export type FormTagTransactionState = Record<
+  TransactionTagId,
+  { autoTag: boolean }
+>;
+
+export async function addTagsToTransactions(
+  tags: FormTagTransactionState
+): Promise<void> {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return;
+  }
+
+  const tagsToPush = Object.entries(tags).map(([id, { autoTag }]) => {
+    const { transactionId, tagId } = tagIdAndTransactionIdFromId(
+      id as TransactionTagId
+    );
+    return {
+      transaction_id: transactionId,
+      tag_id: tagId,
+      autoTag,
+    };
+  });
+
+  console.log(tagsToPush);
+
+  await db.insert(tagsLinkNew).values(tagsToPush);
+  revalidatePath("/dashboard");
 }
 
 export async function addTagToTransaction_v2({

@@ -8,7 +8,7 @@ import {
   transactions,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { and, inArray, eq, or, notInArray, sql, desc } from "drizzle-orm";
+import { and, inArray, eq, or, notInArray, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cache } from "react";
 import * as R from "remeda";
