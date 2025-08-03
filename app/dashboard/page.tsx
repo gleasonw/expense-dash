@@ -31,7 +31,7 @@ import {
 } from "@/app/dashboard/aggregates";
 
 // TODO
-// - multiple buttons for each tag beneath every new transaction -- bim bang boom, then submit all at once
+// - filter transactions table by month (default this month, also allow all, or specific months)
 // - fix auto tag transaction bug
 // - savings buckets
 
