@@ -5,6 +5,7 @@
 .env.local
 node_modules
 yarn.lock
+*.tsbuildinfo
 
 # Next.js
 .next/
