@@ -12,24 +12,29 @@ type MonthAggregate = {
   is_current_month: boolean;
 };
 
-export async function getSpendingByMonth(): Promise<{
+type SpendingByMonthArgs = {
+  afterXMonthsAgo?: number;
+};
+
+export async function getSpendingByMonth(args?: SpendingByMonthArgs): Promise<{
   rows: MonthAggregate[];
 }> {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     return { rows: [] };
   }
-  return spendingByMonthForUser(user.user);
+  return spendingByMonthForUser(user.user, args);
 }
 
 const spendingByMonthForUser = cache(
   async (
-    user: User
+    user: User,
+    { afterXMonthsAgo }: SpendingByMonthArgs = {}
   ): Promise<{
     rows: MonthAggregate[];
   }> => {
     return (await db.execute(
-      sql`
+      sql.raw(`
       SELECT
           DATE_TRUNC('month', t.date) AS month,
           SUM(CAST(t.amount AS NUMERIC)) AS amount,
@@ -49,11 +54,14 @@ const spendingByMonthForUser = cache(
       WHERE
           t.user_id = ${user.id}
           AND tv.tag not in ('income', 'transfer')
+          AND DATE_TRUNC('month', t.date) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '${
+            afterXMonthsAgo ?? 12
+          } months')
       GROUP BY
           DATE_TRUNC('month', t.date), tv.id
       ORDER BY
           month;
-    `
+    `)
     )) as {
       rows: {
         month: string;
