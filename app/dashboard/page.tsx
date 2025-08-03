@@ -4,11 +4,9 @@ import {
   setTagAllocation,
 } from "@/app/dashboard/actions";
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
-import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { SpendingTable } from "@/app/dashboard/SpendingTable";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
-import * as style from "@/app/dashboard/dashboard.module.css";
 import { userTable, tagAllocations, tags_new } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { eq, sql } from "drizzle-orm";
@@ -73,13 +71,11 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  const [spendingByMonth, tsMerged, incomeQuery, spendingLast4Months] =
-    await Promise.all([
-      getSpendingByMonth({ afterXMonthsAgo: 12 }),
-      getTransactionsWithTags({ tag: filterByTag }),
-      getIncomeByMonth(),
-      getSpendingByMonth({ afterXMonthsAgo: 4 }),
-    ]);
+  const [spendingByMonth, tsMerged, incomeQuery] = await Promise.all([
+    getSpendingByMonth({ afterXMonthsAgo: 12 }),
+    getTransactionsWithTags({ tag: filterByTag }),
+    getIncomeByMonth(),
+  ]);
   const estIncomeForPeriod = Math.round(
     parseInt(incomeQuery?.rows?.[0]?.amount ?? "", 10) * -1
   );
@@ -93,10 +89,6 @@ export default async function Dashboard({
         <button className="border" onClick={tryAutoTagTransactions}>
           Autotag transactions
         </button>
-      </div>
-      {/**@ts-expect-error css modules are a pain with ts */}
-      <div className={style.chart}>
-        <SpendingChart discretionaryByMonth={spendingLast4Months.rows} />
       </div>
 
       <div className="flex flex-wrap">
@@ -112,7 +104,7 @@ export default async function Dashboard({
           </Suspense>
         </div>
 
-        <div className="w-full hidden sm:flex flex-col">
+        <div className="max-w-[1100] mx-auto hidden sm:flex flex-col gap-3">
           <TagMaker />
           <TransactionFilters />
           <SpendingTable rows={tsMerged} />

@@ -52,6 +52,30 @@ export async function createTag(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function updateTransactionDate(
+  transactionId: string,
+  date: string
+) {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return;
+  }
+  console.log("updating transaction date", {
+    transactionId,
+    date,
+  });
+  await db
+    .update(transactions)
+    .set({ date: new Date(date).toISOString() })
+    .where(
+      and(
+        eq(transactions.transaction_id, transactionId),
+        eq(transactions.user_id, user.user.id)
+      )
+    );
+  revalidatePath("/dashboard");
+}
+
 export async function setTagAllocation(formData: FormData) {
   "use server";
   const allocations = Array.from(formData.entries())

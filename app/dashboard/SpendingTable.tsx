@@ -8,19 +8,61 @@ import {
   addTagToTransaction_v2,
   FormTagTransactionState,
   removeTagFromTransaction,
+  updateTransactionDate,
 } from "@/app/dashboard/actions";
 import { idForTagTransaction } from "@/app/dashboard/transaction_utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
 
 const columns = [
-  "date",
-  "name",
   "amount",
+  "name",
+  "date",
 ] as const satisfies (keyof Transaction)[];
+
+function TransactionDateEditor({
+  date,
+  transaction,
+}: {
+  date?: Date;
+  transaction: { id: string };
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          data-empty={!date}
+          className="data-[empty=true]:text-muted-foreground w-[200px] justify-start text-left font-normal"
+        >
+          <CalendarIcon />
+          {date ? format(date, "PPP") : <span>Pick a date</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={(date) =>
+            date && updateTransactionDate(transaction.id, date?.toISOString())
+          }
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function rendererForColumn(
   column: (typeof columns)[number],
   transaction: TransactionWithTags
-): string {
+): string | React.ReactNode {
   switch (column) {
     case "amount":
       // amount is actually a string here. we need to parse it to a number
@@ -29,10 +71,12 @@ function rendererForColumn(
         currency: "USD",
       });
     case "date":
-      // simple day date
-      return new Date(transaction.date).toLocaleDateString("en-US", {
-        dateStyle: "long",
-      });
+      return (
+        <TransactionDateEditor
+          date={transaction.date ? new Date(transaction.date) : undefined}
+          transaction={{ id: transaction.transaction_id }}
+        />
+      );
 
     default:
       const value = transaction[column];
@@ -55,10 +99,10 @@ export const SpendingTable = observer(function QueryResults({
     <table className="w-full">
       <thead>
         <tr>
-          <th>Tags</th>
           {columns.map((column) => (
             <th key={column}>{column}</th>
           ))}
+          <th>tags</th>
         </tr>
       </thead>
       <tbody className="space-y-4">
@@ -79,6 +123,15 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
       key={transaction.transaction_id}
       className="border-spacing-5 border-2 odd:bg-gray-100"
     >
+      {columns.map((column) => (
+        <td
+          key={`${transaction.transaction_id}-${column}`}
+          className="text-left p-3"
+        >
+          {/* Handle different data types and potential null values */}
+          {rendererForColumn(column, transaction as TransactionWithTags)}
+        </td>
+      ))}
       <td className="p-3">
         {transaction.tags?.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -100,15 +153,6 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
           </div>
         ) : null}
       </td>
-      {columns.map((column) => (
-        <td
-          key={`${transaction.transaction_id}-${column}`}
-          className="text-right"
-        >
-          {/* Handle different data types and potential null values */}
-          {rendererForColumn(column, transaction as TransactionWithTags)}
-        </td>
-      ))}
     </tr>
   );
 }
