@@ -15,7 +15,6 @@ import { eq, sql } from "drizzle-orm";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
-import { SpendChecker } from "@/app/dashboard/SpendChecker";
 import Link from "next/link";
 import {
   autoTagTransactions,
@@ -74,11 +73,13 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  const [spendingByMonth, tsMerged, incomeQuery] = await Promise.all([
-    getSpendingByMonth(),
-    getTransactionsWithTags({ tag: filterByTag }),
-    getIncomeByMonth(),
-  ]);
+  const [spendingByMonth, tsMerged, incomeQuery, spendingLast4Months] =
+    await Promise.all([
+      getSpendingByMonth({ afterXMonthsAgo: 12 }),
+      getTransactionsWithTags({ tag: filterByTag }),
+      getIncomeByMonth(),
+      getSpendingByMonth({ afterXMonthsAgo: 4 }),
+    ]);
   const estIncomeForPeriod = Math.round(
     parseInt(incomeQuery?.rows?.[0]?.amount ?? "", 10) * -1
   );
@@ -93,22 +94,22 @@ export default async function Dashboard({
           Autotag transactions
         </button>
       </div>
-      <TargetForTagPicker />
       {/**@ts-expect-error css modules are a pain with ts */}
       <div className={style.chart}>
-        <SpendingChart discretionaryByMonth={spendingByMonth.rows} />
+        <SpendingChart discretionaryByMonth={spendingLast4Months.rows} />
       </div>
 
       <div className="flex flex-wrap">
-        <div className="flex flex-col gap-10 p-3">
-          <div className="flex flex-col bg-gray-100 rounded-lg pg-3 max-w-[600px]">
+        <div className="flex flex-wrap gap-10 p-3">
+          <div className="flex flex-wrap bg-gray-100 rounded-lg pg-3 max-w-[600px]">
+            <TargetForTagPicker />
+
             <Income taggedSpendingByPeriod={spendingByMonth.rows} />
             <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
           </div>
           <Suspense>
             <NetSpendingByMonth />
           </Suspense>
-          <HowMuchDidISpendOnTag />
         </div>
 
         <div className="w-full hidden sm:flex flex-col">
@@ -238,24 +239,6 @@ async function TransactionFilters() {
         <div className="p-2 border hover:bg-gray-200">All</div>
       </Link>
     </div>
-  );
-}
-
-async function HowMuchDidISpendOnTag() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-  const spendingByTag = await getSpendingByMonth();
-  // TODO: maybe allow us to filter down to a specific month in the sdk
-  const spendingByTagLastMonth = spendingByTag.rows.filter(
-    (t) => t.is_current_month
-  );
-
-  return (
-    <>
-      <SpendChecker spending={spendingByTagLastMonth} />
-    </>
   );
 }
 
@@ -433,10 +416,7 @@ async function Income({
     (t) => t.is_current_month
   );
 
-  const { income, expenses } = R.groupBy(
-    estimatedIncomeAndExpenses.rows,
-    (r) => r.tag
-  );
+  const { income } = R.groupBy(estimatedIncomeAndExpenses.rows, (r) => r.tag);
 
   const currentPeriodSpendingByTag = R.indexBy(
     currentPeriodSpending,
@@ -444,19 +424,12 @@ async function Income({
   );
 
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
-  const estExpenses = parseInt(expenses?.[0].amount ?? "0", 10);
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex gap-3 flex-wrap">
-        <Label text="Est. Income">
-          <span>${estIncome}</span>
-        </Label>
-        <Label text="Est. Expenses">-${estExpenses}</Label>
-        <Label text="Non defense discretionary">
-          <span>${estIncome - estExpenses}</span>
-        </Label>
-      </div>
+    <div className="flex flex-wrap gap-5">
+      <Label text="Est. Income">
+        <span>${estIncome}</span>
+      </Label>
       <div className="flex gap-5 flex-wrap">
         {toTrack.map((kind) => {
           const targetSpending = (targets[kind] / 100) * estIncome;
