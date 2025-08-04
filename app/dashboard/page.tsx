@@ -10,6 +10,7 @@ import { db } from "@/server/db";
 import { userTable, tagAllocations, tags_new } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { eq, sql } from "drizzle-orm";
+import * as style from "@/app/dashboard/dashboard.module.css";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
 import { Label } from "@/app/components/Label";
@@ -29,6 +30,7 @@ import {
   getNetSpendingByMonth,
   getSpendingByMonth,
 } from "@/app/dashboard/aggregates";
+import { SpendingChart } from "@/app/dashboard/SpendingChart";
 
 // TODO
 // - filter transactions table by month (default this month, also allow all, or specific months)
@@ -71,11 +73,13 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  const [spendingByMonth, tsMerged, incomeQuery] = await Promise.all([
-    getSpendingByMonth({ afterXMonthsAgo: 12 }),
-    getTransactionsWithTags({ tag: filterByTag }),
-    getIncomeByMonth(),
-  ]);
+  const [spendingByMonth, tsMerged, incomeQuery, spendingLast4Months] =
+    await Promise.all([
+      getSpendingByMonth({ afterXMonthsAgo: 12 }),
+      getTransactionsWithTags({ tag: filterByTag }),
+      getIncomeByMonth(),
+      getSpendingByMonth({ afterXMonthsAgo: 3 }),
+    ]);
   const estIncomeForPeriod = Math.round(
     parseInt(incomeQuery?.rows?.[0]?.amount ?? "", 10) * -1
   );
@@ -102,6 +106,10 @@ export default async function Dashboard({
           <Suspense>
             <NetSpendingByMonth />
           </Suspense>
+        </div>
+        {/**@ts-expect-error css modules are a pain with ts */}
+        <div className={style.chart}>
+          <SpendingChart discretionaryByMonth={spendingLast4Months.rows} />
         </div>
 
         <div className="max-w-[1100] mx-auto hidden sm:flex flex-col gap-3">
