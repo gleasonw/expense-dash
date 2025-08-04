@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 
 const columns = [
@@ -26,6 +25,13 @@ const columns = [
   "name",
   "date",
 ] as const satisfies (keyof Transaction)[];
+
+const utcFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  year: "numeric",
+  month: "long",
+  day: "2-digit",
+});
 
 function TransactionDateEditor({
   date,
@@ -43,7 +49,7 @@ function TransactionDateEditor({
           className="data-[empty=true]:text-muted-foreground w-[200px] justify-start text-left font-normal"
         >
           <CalendarIcon />
-          {date ? format(date, "PPP") : <span>Pick a date</span>}
+          {date ? utcFormatter.format(date) : <span>Pick a date</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">
