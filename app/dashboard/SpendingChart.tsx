@@ -64,6 +64,15 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
         column: {
           stacking: undefined,
           grouping: "normal",
+          dataLabels: {
+            enabled: true,
+            format: "${point.y:.2f}",
+            style: {
+              fontWeight: "bold",
+              color: "black",
+              textOutline: "1px contrast",
+            },
+          },
         },
       },
       series: Object.entries(groupedData).map(([tag, data]) => ({
