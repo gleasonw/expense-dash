@@ -91,7 +91,7 @@ export async function autoTagTransactions(
     );
 
   const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
-  console.log(`found some auto tags`, Object.values(autoTagsByName).length);
+  console.log(`found some auto tags`, autoTags);
   const transactionsToAutotag = ts.reduce((acc, t) => {
     const autoTag = autoTagsByName[t.name];
     if (!autoTag) {
@@ -100,6 +100,11 @@ export async function autoTagTransactions(
     acc.push({ transaction_id: t.transaction_id, tag_id: autoTag.tag_id });
     return acc;
   }, [] as { transaction_id: string; tag_id: string }[]);
+
+  if (transactionsToAutotag.length === 0) {
+    console.log("no transactions to auto tag");
+    return;
+  }
   const autoTagged = await db
     .insert(tagsLinkNew)
     .values(
