@@ -6,7 +6,7 @@ import {
 import { TransactionCategorizer } from "@/app/dashboard/SpendingTable";
 import { idForTagTransaction } from "@/app/dashboard/transaction_utils";
 import { TransactionWithTags } from "@/server/schema";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 export type SpendingCategorizerProps = {
   transactionsWithoutTag: Array<TransactionWithTags>;
@@ -18,6 +18,7 @@ export function SpendingCategorizer({
   const [pendingTransactionTags, setPendingTransactionTags] = useState<
     Record<TransactionTagId, { autoTag: boolean }>
   >({});
+  const [isPending, startTransition] = useTransition();
 
   function removeTag({
     transactionId,
@@ -56,9 +57,10 @@ export function SpendingCategorizer({
     <form
       className="flex flex-col gap-4"
       action={() => {
-        console.log(pendingTransactionTags);
         setPendingTransactionTags({});
-        addTagsToTransactions(pendingTransactionTags);
+        startTransition(() => {
+          addTagsToTransactions(pendingTransactionTags);
+        });
       }}
     >
       <div className="flex flex-wrap gap-10">
@@ -76,7 +78,7 @@ export function SpendingCategorizer({
         ))}
       </div>
       <button className="bg-green-200 text-green-800 px-4 py-2 rounded-md hover:bg-green-300">
-        Categorize Transactions
+        {isPending ? "Categorizing..." : "Categorize Transactions"}
       </button>
     </form>
   );

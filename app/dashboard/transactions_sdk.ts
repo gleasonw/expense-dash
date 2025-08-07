@@ -16,28 +16,35 @@ import * as R from "remeda";
 export async function tryAutoTagTransactions() {
   const userWithAccount = await getUserWithToken();
   if (userWithAccount === "no-plaid-account") {
+    console.error(`no plaid account`);
     return {
       error: "no-plaid-account",
       message: "You need to connect your bank account to use this feature.",
     };
   }
-  const transactionsWithNoTag = await db
-    .select()
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.user_id, userWithAccount.user.id),
-        notInArray(
-          transactions.transaction_id,
-          //todo: should I add user id to tagsLinkNew?
-          db
-            .select({ transaction_id: tagsLinkNew.transaction_id })
-            .from(tagsLinkNew)
+  try {
+    const transactionsWithNoTag = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.user_id, userWithAccount.user.id),
+          notInArray(
+            transactions.transaction_id,
+            //todo: should I add user id to tagsLinkNew?
+            db
+              .select({ transaction_id: tagsLinkNew.transaction_id })
+              .from(tagsLinkNew)
+          )
         )
-      )
-    );
+      );
 
-  await autoTagTransactions(transactionsWithNoTag);
+    console.log(`trying auto tag`, transactionsWithNoTag.length);
+
+    await autoTagTransactions(transactionsWithNoTag);
+  } catch (e) {
+    throw e;
+  }
 }
 
 export async function autoTagTransactions(
@@ -47,13 +54,23 @@ export async function autoTagTransactions(
     transaction_id: string;
   }[]
 ) {
+  console.log(`attemping auto tag`, ts.length);
   const userWithAccount = await getUserWithToken();
   if (userWithAccount === "no-plaid-account") {
+    console.error(`no plaid account`);
     return {
       error: "no-plaid-account",
       message: "You need to connect your bank account to use this feature.",
     };
   }
+  console.log(
+    "here are some names",
+    ts.map((t) => t.name)
+  );
+  console.log(
+    "here are some more names",
+    ts.map((t) => t.merchant_name)
+  );
   const autoTags = await db
     .select()
     .from(auto_tag_merchants_new)
@@ -74,6 +91,7 @@ export async function autoTagTransactions(
     );
 
   const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
+  console.log(`found some auto tags`, Object.values(autoTagsByName).length);
   const transactionsToAutotag = ts.reduce((acc, t) => {
     const autoTag = autoTagsByName[t.name];
     if (!autoTag) {
