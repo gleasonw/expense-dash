@@ -73,6 +73,9 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
+  // todo: eventually this shouldn't really be necessary, but just want to see if this solves the "auto tags aren't being applied" issue
+  await tryAutoTagTransactions();
+
   const [spendingByMonth, tsMerged, incomeQuery, spendingLast4Months] =
     await Promise.all([
       getSpendingByMonth({ afterXMonthsAgo: 12 }),
