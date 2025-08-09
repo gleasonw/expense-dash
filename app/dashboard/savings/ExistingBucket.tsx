@@ -4,7 +4,13 @@ import { createMovement } from "@/app/dashboard/bucket_actions";
 import { BucketWithMovements } from "@/app/dashboard/buckets_sdk";
 import { useState } from "react";
 
-export function ExistingBucket({ bucket }: { bucket: BucketWithMovements }) {
+export function ExistingBucket({
+  bucket,
+  savingsTarget,
+}: {
+  bucket: BucketWithMovements;
+  savingsTarget?: number;
+}) {
   const [movementAmount, setMovementAmount] = useState("");
 
   const totalAllocated = bucket.movements.reduce(
@@ -50,7 +56,9 @@ export function ExistingBucket({ bucket }: { bucket: BucketWithMovements }) {
           <h2>{bucket.name}</h2>
           {bucket.targetPercentage && <p>{bucket.targetPercentage}</p>}
           <div>
-            Expected monthly movement <span>**mark as complete**</span>
+            Expected monthly:{" "}
+            {(savingsTarget ?? 0) * parseFloat(bucket.targetPercentage ?? "0")}{" "}
+            <span>**mark as complete**</span>
           </div>
         </div>
       );

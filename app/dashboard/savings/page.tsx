@@ -1,4 +1,7 @@
-import { getSpendingByMonth } from "@/app/dashboard/aggregates";
+import {
+  getMonthTargetForTag,
+  getSpendingByMonth,
+} from "@/app/dashboard/aggregates";
 import { getBuckets } from "@/app/dashboard/buckets_sdk";
 import { BucketForm } from "@/app/dashboard/savings/BucketForm";
 import { ExistingBucket } from "@/app/dashboard/savings/ExistingBucket";
@@ -21,9 +24,9 @@ export default async function Savings() {
   const currentMonthSavings = rows.find(
     (row) => row.is_current_month && row.tag === "savings"
   );
-  const priorMonthSavings = rows.find(
-    (row) => !row.is_current_month && row.tag === "savings"
-  );
+
+  const savingsTarget = await getMonthTargetForTag("savings");
+  console.log({ savingsTarget });
   return (
     <div className="p-3 flex flex-col gap-5">
       <BucketForm />
@@ -34,10 +37,15 @@ export default async function Savings() {
           {currentMonthSavings?.amount}
         </div>
         <div>
-          <h2>Prior Month</h2>
-          {priorMonthSavings?.amount}
-          TODO: just show target savings here, get allocation percent, multiply
-          by expected income
+          <h2>target from est income</h2>
+          {savingsTarget?.target}
+        </div>
+        <div>
+          <h2>diff, to spend</h2>
+          {savingsTarget && currentMonthSavings
+            ? savingsTarget.target -
+              (parseInt(currentMonthSavings?.amount) ?? 0)
+            : 0}
         </div>
         <div>
           TODO: warning 1: total movements exceed current actual savings
@@ -47,7 +55,11 @@ export default async function Savings() {
       </div>
       <div className="flex flex-wrap gap-5">
         {buckets.map((bucket) => (
-          <ExistingBucket key={bucket.id} bucket={bucket} />
+          <ExistingBucket
+            key={bucket.id}
+            bucket={bucket}
+            savingsTarget={savingsTarget?.target}
+          />
         ))}
       </div>
     </div>
