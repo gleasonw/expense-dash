@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ReactQueryProvider } from "@/app/ReactQueryProvider";
+import Link from "next/link";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +29,12 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Link href="/dashboard">
+          <button className="p-2 border hover:bg-gray-200">Dashboard</button>
+        </Link>
+        <Link href="/dashboard/savings">
+          <button className="p-2 border hover:bg-gray-200">Savings</button>
+        </Link>
         <ReactQueryProvider>{children}</ReactQueryProvider>
       </body>
     </html>
