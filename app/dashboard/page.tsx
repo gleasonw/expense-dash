@@ -328,10 +328,18 @@ async function Expenses({
 //TODO: update to reference tags_new
 
 async function TargetForTagPicker() {
-  const allTags = await db.query.tags.findMany({ with: { allocation: true } });
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return <div>no plaid</div>;
+  }
+  const allTags = await db.query.tags_new.findMany({
+    where: eq(tags_new.userId, user.user.id),
+    with: { allocation: true },
+  });
   const tags = allTags.filter(
     (t) => t.tag !== "income" && t.tag !== "transfer"
   );
+  console.log({ tags });
   const sumAllocations = tags.reduce((acc, t) => {
     return acc + parseInt(t.allocation?.allocation ?? "0", 10);
   }, 0);
@@ -345,7 +353,7 @@ async function TargetForTagPicker() {
           <Label text={t.tag} key={t.tag}>
             <div className="flex gap-2">
               <input
-                name={t.tag}
+                name={t.id}
                 type="number"
                 className="w-14 inset-4 border"
                 defaultValue={t.allocation?.allocation ?? ""}

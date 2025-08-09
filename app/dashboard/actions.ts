@@ -6,6 +6,7 @@ import { getUserWithToken } from "@/server/session";
 import {
   auto_tag_merchants_new,
   tagAllocations,
+  tagAllocationsNew,
   tags_new,
   tagsLinkNew,
   transactions,
@@ -77,10 +78,9 @@ export async function updateTransactionDate(
 }
 
 export async function setTagAllocation(formData: FormData) {
-  "use server";
   const allocations = Array.from(formData.entries())
-    .map(([tag, allocation]) => ({
-      tag,
+    .map(([tagId, allocation]) => ({
+      tagId,
       allocation,
     }))
     .filter((a) => !isNaN(parseFloat(a.allocation as string)));
@@ -92,16 +92,16 @@ export async function setTagAllocation(formData: FormData) {
   console.log({ user, allocations });
 
   await db
-    .insert(tagAllocations)
+    .insert(tagAllocationsNew)
     .values(
       allocations.map((a) => ({
-        tag: a.tag,
+        tag_id: a.tagId,
         allocation: a.allocation as string,
         user_id: user.user.id,
       }))
     )
     .onConflictDoUpdate({
-      target: [tagAllocations.user_id, tagAllocations.tag],
+      target: [tagAllocationsNew.user_id, tagAllocationsNew.tag_id],
       set: { allocation: sql`excluded.allocation` },
     });
   revalidatePath("/dashboard");
