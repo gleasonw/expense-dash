@@ -325,6 +325,8 @@ async function Expenses({
   );
 }
 
+//TODO: update to reference tags_new
+
 async function TargetForTagPicker() {
   const allTags = await db.query.tags.findMany({ with: { allocation: true } });
   const tags = allTags.filter(

@@ -6,9 +6,22 @@ import {
   boolean,
   primaryKey,
   uuid,
+  pgEnum,
 } from "drizzle-orm/pg-core";
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
-import { relations, type InferSelectModel } from "drizzle-orm";
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  timestamp,
+  check,
+} from "drizzle-orm/pg-core";
+import {
+  InferInsertModel,
+  relations,
+  sql,
+  type InferSelectModel,
+} from "drizzle-orm";
 import { TransactionTag } from "@/app/dashboard/types";
 
 export const transactions = pgTable("transactions", {
@@ -197,42 +210,84 @@ export const sessionTable = pgTable("session", {
   }).notNull(),
 });
 
-export const savingsBuckets = pgTable("savings_buckets", {
-  id: serial("id").primaryKey(),
-  user_id: integer("user_id")
-    .notNull()
-    .references(() => userTable.id),
-  name: text("name").notNull(),
-  target_amount: decimal("target_amount").notNull(),
-  current_amount: decimal("current_amount").notNull(),
-  created_at: timestamp("created_at", {
-    withTimezone: true,
-    mode: "date",
-  }).notNull(),
-  updated_at: timestamp("updated_at", {
-    withTimezone: true,
-    mode: "date",
-  }).notNull(),
-});
+export const bucketTypeEnum = pgEnum("bucket_type", ["goal", "ongoing"]);
 
-export const savingsAllocations = pgTable("savings_allocations", {
-  id: serial("id").primaryKey(),
-  user_id: integer("user_id")
-    .notNull()
-    .references(() => userTable.id),
-  bucket_id: integer("bucket_id")
-    .notNull()
-    .references(() => savingsBuckets.id),
-  allocation: decimal("allocation").notNull(),
-  created_at: timestamp("created_at", {
-    withTimezone: true,
-    mode: "date",
-  }).notNull(),
-  updated_at: timestamp("updated_at", {
-    withTimezone: true,
-    mode: "date",
-  }).notNull(),
-});
+export const buckets = pgTable(
+  "buckets",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => userTable.id),
+    name: text("name").notNull(),
+    isArchived: boolean("is_archived").notNull().default(false),
+    type: bucketTypeEnum("type").notNull(), // 'goal' | 'ongoing'
+    targetAmount: decimal("target_amount", { precision: 20, scale: 2 }), // only for goal
+    targetPercentage: decimal("target_percentage", { precision: 8, scale: 4 }), // 0..1 only for ongoing
+    color: text("color"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "targetPercent",
+      sql`(${t.targetPercentage} IS NULL OR (${t.targetPercentage} >= 0 AND ${t.targetPercentage} <= 1))`
+    ),
+    check(
+      "targetAmountPositive",
+      sql`(${t.targetAmount} IS NULL OR ${t.targetAmount} >= 0)`
+    ),
+    check(
+      "goalShape",
+      sql`((${t.type} <> 'goal') OR (${t.targetAmount} IS NOT NULL AND ${t.targetPercentage} IS NULL))`
+    ),
+    check(
+      "ongoingShape",
+      sql`((${t.type} <> 'ongoing') OR (${t.targetPercentage} IS NOT NULL AND ${t.targetAmount} IS NULL))`
+    ),
+  ]
+);
+
+export const bucketsRelations = relations(buckets, ({ many }) => ({
+  movements: many(bucketMovements),
+}));
+
+export const bucketMovements = pgTable(
+  "bucket_movements",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => userTable.id),
+    bucketId: integer("bucket_id")
+      .notNull()
+      .references(() => buckets.id),
+    amount: decimal("amount", { precision: 20, scale: 2 }).notNull(), // +/-
+    note: text("note"),
+    transactionId: text("transaction_id"), // optional link to a real transaction
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [check("nonZero", sql`(${t.amount} <> 0)`)]
+);
+
+export const bucketMovementsRelations = relations(
+  bucketMovements,
+  ({ one }) => ({
+    bucket: one(buckets, {
+      fields: [bucketMovements.bucketId],
+      references: [buckets.id],
+    }),
+  })
+);
 
 export const plaidAccount = pgTable("plaid_account", {
   id: serial("id").primaryKey(),
@@ -256,3 +311,7 @@ export const plaidAccountRelations = relations(plaidAccount, ({ one }) => ({
 
 export type User = InferSelectModel<typeof userTable>;
 export type Session = InferSelectModel<typeof sessionTable>;
+export type PostBucket = InferInsertModel<typeof buckets>;
+export type Bucket = InferSelectModel<typeof buckets>;
+export type PostMovement = InferInsertModel<typeof bucketMovements>;
+export type Movement = InferSelectModel<typeof bucketMovements>;
