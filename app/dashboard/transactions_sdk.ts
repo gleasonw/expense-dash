@@ -13,6 +13,55 @@ import { revalidatePath } from "next/cache";
 import { cache } from "react";
 import * as R from "remeda";
 
+/**developer utility, helpful when booting up a new deployment */
+export async function tagAllAsFirstTag() {
+  const userWithAccount = await getUserWithToken();
+  if (userWithAccount === "no-plaid-account") {
+    console.error(`no plaid account`);
+    return {
+      error: "no-plaid-account",
+      message: "You need to connect your bank account to use this feature.",
+    };
+  }
+  try {
+    const transactionsWithNoTag = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.user_id, userWithAccount.user.id),
+          notInArray(
+            transactions.transaction_id,
+            db
+              .select({ transaction_id: tagsLinkNew.transaction_id })
+              .from(tagsLinkNew)
+          )
+        )
+      );
+
+    const firstTag = await db
+      .select()
+      .from(tags_new)
+      .where(eq(tags_new.userId, userWithAccount.user.id))
+      .limit(1);
+
+    const tag = firstTag[0];
+
+    if (!tag) {
+      console.error("No tags found for user, cannot auto tag transactions");
+      return;
+    }
+
+    const tagLinksToUpsert = transactionsWithNoTag.map((t) => ({
+      transaction_id: t.transaction_id,
+      tag_id: tag.id,
+    }));
+    await db.insert(tagsLinkNew).values(tagLinksToUpsert).onConflictDoNothing();
+  } catch (e) {
+    throw e;
+  }
+}
+
 export async function tryAutoTagTransactions() {
   const userWithAccount = await getUserWithToken();
   if (userWithAccount === "no-plaid-account") {
