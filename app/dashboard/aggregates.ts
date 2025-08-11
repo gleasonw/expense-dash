@@ -1,7 +1,7 @@
 import { db } from "@/server/db";
 import { User } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { sql } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
 import { cache } from "react";
 
 type MonthAggregate = {
@@ -15,6 +15,57 @@ type MonthAggregate = {
 type SpendingByMonthArgs = {
   afterXMonthsAgo?: number;
 };
+
+// TODO: clean this up... very closet drawer
+export async function getMonthTargetForTag(tag: string) {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return null;
+  }
+  const thisAndLastMonthSpending = await getSpendingByMonth({
+    afterXMonthsAgo: 1,
+  });
+
+  console.log({ thisAndLastMonthSpending });
+
+  //TODO: this is a bit klunky, need to figure out a more expressive API
+  const lastMonthIncome = thisAndLastMonthSpending.rows.reduce((acc, rows) => {
+    if (rows.tag !== "income" || rows.is_current_month) {
+      return acc;
+    }
+    return acc + parseFloat(rows.amount);
+  }, 0);
+
+  const fullTag = await db.query.tags_new.findFirst({
+    where: (tags_new, { eq }) =>
+      and(eq(tags_new.tag, tag), eq(tags_new.userId, user.user.id)),
+  });
+
+  if (!fullTag) {
+    console.error(`Tag not found: ${tag}`);
+    return null;
+  }
+
+  const tagAllocation = await db.query.tagAllocationsNew.findFirst({
+    where: (tagAllocationsNew, { eq }) =>
+      eq(tagAllocationsNew.tag_id, fullTag.id) &&
+      eq(tagAllocationsNew.user_id, user.user.id),
+  });
+
+  if (!tagAllocation) {
+    console.error(`Tag allocation not found for tag: ${tag}`);
+    return null;
+  }
+
+  const allocationPercent = parseFloat(tagAllocation.allocation) / 100;
+
+  return {
+    fullTag,
+    lastMonthIncome,
+    tagAllocation,
+    target: lastMonthIncome * allocationPercent * -1,
+  };
+}
 
 export async function getSpendingByMonth(args?: SpendingByMonthArgs): Promise<{
   rows: MonthAggregate[];
@@ -53,7 +104,6 @@ const spendingByMonthForUser = cache(
           tags_v2 tv ON tl.tag_id = tv.id
       WHERE
           t.user_id = ${user.id}
-          AND tv.tag not in ('income', 'transfer')
           AND DATE_TRUNC('month', t.date) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '${
             afterXMonthsAgo ?? 12
           } months')
