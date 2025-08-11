@@ -5,7 +5,6 @@ import { db } from "@/server/db";
 import { getUserWithToken } from "@/server/session";
 import {
   auto_tag_merchants_new,
-  tagAllocations,
   tagAllocationsNew,
   tags_new,
   tagsLinkNew,
