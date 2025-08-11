@@ -7,8 +7,8 @@ import { useState, useTransition } from "react";
 export function BucketForm() {
   const [formState, setFormState] = useState<Omit<PostBucket, "userId">>({
     name: "",
-    targetAmount: "",
-    targetPercentage: "",
+    targetAmount: null,
+    targetPercentage: null,
     type: "goal",
   });
   const [isPending, startTransition] = useTransition();
@@ -33,13 +33,10 @@ export function BucketForm() {
   }
 
   function setTargetPercentage(value: string) {
-    const percentage = parseFloat(value);
     if (formState.type === "goal") {
       return;
     }
-    if (!isNaN(percentage) && percentage >= 0 && percentage <= 1) {
-      setFormState({ ...formState, targetPercentage: value });
-    }
+    setFormState({ ...formState, targetPercentage: value });
   }
 
   function setType(type: string) {

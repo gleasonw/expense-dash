@@ -395,13 +395,14 @@ async function Income({
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
-  // todo: dedupe, migrate to new custom tag model
-  const allTags = await db.query.tags.findMany({ with: { allocation: true } });
+  const allTags = await db.query.tags_new.findMany({
+    with: { allocation: true },
+  });
   const tagsTracked = allTags.filter((t) =>
     toTrack.includes(t.tag as TargetKind)
   );
   const targets = tagsTracked.reduce((acc, t) => {
-    if (isNaN(parseInt(t.allocation.allocation))) {
+    if (isNaN(parseInt(t.allocation?.allocation))) {
       return acc;
     }
     acc[t.tag as TargetKind] = parseInt(t.allocation.allocation, 10);
