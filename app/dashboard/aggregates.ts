@@ -14,6 +14,7 @@ type MonthAggregate = {
 
 type SpendingByMonthArgs = {
   afterXMonthsAgo?: number;
+  excludeTags?: string[];
 };
 
 // TODO: clean this up... very closet drawer
@@ -77,10 +78,11 @@ export async function getSpendingByMonth(args?: SpendingByMonthArgs): Promise<{
   return spendingByMonthForUser(user.user, args);
 }
 
+// TODO: sql injection?
 const spendingByMonthForUser = cache(
   async (
     user: User,
-    { afterXMonthsAgo }: SpendingByMonthArgs = {}
+    { afterXMonthsAgo, excludeTags }: SpendingByMonthArgs = {}
   ): Promise<{
     rows: MonthAggregate[];
   }> => {
@@ -107,6 +109,13 @@ const spendingByMonthForUser = cache(
           AND DATE_TRUNC('month', t.date) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '${
             afterXMonthsAgo ?? 12
           } months')
+          ${
+            excludeTags && excludeTags.length > 0
+              ? `AND tv.tag NOT IN (${excludeTags
+                  .map((tag) => `'${tag}'`)
+                  .join(", ")})`
+              : ""
+          }
       GROUP BY
           DATE_TRUNC('month', t.date), tv.id
       ORDER BY
