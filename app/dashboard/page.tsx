@@ -7,7 +7,13 @@ import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { SpendingTable } from "@/app/dashboard/SpendingTable";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
-import { userTable, tagAllocations, tags_new } from "@/server/schema";
+import {
+  userTable,
+  tagAllocations,
+  tags_new,
+  Tag,
+  TagAllocation,
+} from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { eq, sql } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
@@ -47,6 +53,8 @@ export default async function Dashboard({
   const userWithAccount = await getUserWithToken();
   const params = await searchParams;
   const filterByTag = params.tag as string | undefined;
+  // const monthUTC = params.monthUTC as string | undefined;
+  // const pastXMonths = params.pastXMonths as string | undefined;
   if (userWithAccount === "no-plaid-account") {
     return redirect("/link");
   }
@@ -83,7 +91,10 @@ export default async function Dashboard({
       getSpendingByMonth({ afterXMonthsAgo: 12 }),
       getTransactionsWithTags({ tag: filterByTag }),
       getIncomeByMonth(),
-      getSpendingByMonth({ afterXMonthsAgo: 3 }),
+      getSpendingByMonth({
+        afterXMonthsAgo: 2,
+        excludeTags: ["income", "transfer"],
+      }),
     ]);
   const estIncomeForPeriod = Math.round(
     parseInt(incomeQuery?.rows?.[0]?.amount ?? "", 10) * -1
@@ -105,9 +116,7 @@ export default async function Dashboard({
 
       <div className="flex flex-wrap">
         <div className="flex flex-wrap gap-10 p-3">
-          <div className="flex flex-wrap bg-gray-100 rounded-lg pg-3 max-w-[600px]">
-            <TargetForTagPicker />
-
+          <div className="flex flex-wrap rounded-lg pg-3 max-w-[600px]">
             <Income taggedSpendingByPeriod={spendingByMonth.rows} />
             <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
           </div>
@@ -327,50 +336,6 @@ async function Expenses({
 
 //TODO: update to reference tags_new
 
-async function TargetForTagPicker() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-  const allTags = await db.query.tags_new.findMany({
-    where: eq(tags_new.userId, user.user.id),
-    with: { allocation: true },
-  });
-  const tags = allTags.filter(
-    (t) => t.tag !== "income" && t.tag !== "transfer"
-  );
-  console.log({ tags });
-  const sumAllocations = tags.reduce((acc, t) => {
-    return acc + parseInt(t.allocation?.allocation ?? "0", 10);
-  }, 0);
-  return (
-    <div className="flex flex-col gap-3">
-      <form
-        className="flex items-center gap-3 flex-wrap"
-        action={setTagAllocation}
-      >
-        {tags.map((t) => (
-          <Label text={t.tag} key={t.tag}>
-            <div className="flex gap-2">
-              <input
-                name={t.id}
-                type="number"
-                className="w-14 inset-4 border"
-                defaultValue={t.allocation?.allocation ?? ""}
-              />
-              <span>%</span>
-            </div>
-          </Label>
-        ))}
-        <div>used: {sumAllocations}%</div>
-        <button className="p-2 border hover:bg-gray-200" type="submit">
-          Save
-        </button>
-      </form>
-    </div>
-  );
-}
-
 const toTrack = ["discretionary", "savings", "giving"] as const;
 
 const labelForKind: Record<TargetKind, string> = {
@@ -405,9 +370,9 @@ async function Income({
     if (isNaN(parseInt(t.allocation?.allocation))) {
       return acc;
     }
-    acc[t.tag as TargetKind] = parseInt(t.allocation.allocation, 10);
+    acc[t.tag as TargetKind] = t;
     return acc;
-  }, {} as Record<TargetKind, number>);
+  }, {} as Record<TargetKind, Tag & { allocation: TagAllocation | null }>);
 
   const estimatedIncomeAndExpenses = (await db.execute(
     sql`
@@ -445,13 +410,15 @@ async function Income({
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
 
   return (
-    <div className="flex flex-wrap gap-5">
+    <div className="flex flex-col gap-5">
       <Label text="Est. Income">
         <span>${estIncome}</span>
       </Label>
       <div className="flex gap-5 flex-wrap">
         {toTrack.map((kind) => {
-          const targetSpending = (targets[kind] / 100) * estIncome;
+          const tag = targets[kind];
+          const allocation = parseInt(tag?.allocation?.allocation ?? "0", 10);
+          const targetSpending = (allocation / 100) * estIncome;
           const currentSpending = parseInt(
             currentPeriodSpendingByTag[kind]?.amount ?? "0"
           );
@@ -460,10 +427,33 @@ async function Income({
               className="flex border shadow-lg p-3 gap-5 flex-col bg-white"
               key={kind}
             >
-              <Label text={labelForKind[kind]} className="text-lg">
-                (${Math.round(targetSpending)}) -
-                {isNaN(currentSpending) ? "$0" : `$${currentSpending}`}
-              </Label>
+              <div className="text-lg text-gray-500">{labelForKind[kind]}</div>
+              <form
+                action={setTagAllocation}
+                className="flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  name={tag.id}
+                  defaultValue={allocation}
+                  className="w-12"
+                />
+                <span>%</span>
+                <button type="submit" className="shadow-sm  rounded px-2 py-1">
+                  update
+                </button>
+              </form>
+              <div className="text-xs">
+                ${currentSpending} / ${Math.round(targetSpending)}
+              </div>
+              <div className="w-full h-6 overflow-hidden border rounded">
+                <div
+                  className={`bg-blue-500 relative h-full`}
+                  style={{
+                    width: `${(currentSpending / targetSpending) * 100}%`,
+                  }}
+                ></div>
+              </div>
               <Label text="To spend" className="text-3xl">
                 {isNaN(currentSpending) ? (
                   <span className="text-right">
