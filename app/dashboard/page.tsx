@@ -7,13 +7,7 @@ import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { SpendingTable } from "@/app/dashboard/SpendingTable";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
-import {
-  userTable,
-  tagAllocations,
-  tags_new,
-  Tag,
-  TagAllocation,
-} from "@/server/schema";
+import { userTable, tags_new, Tag, TagAllocation } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { eq, sql } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
@@ -33,17 +27,16 @@ import {
 } from "@/app/dashboard/transaction_utils";
 import { Suspense } from "react";
 import {
-  getIncomeByMonth,
   getNetSpendingByMonth,
-  getSpendingByMonth,
+  spendingForMonth,
 } from "@/app/dashboard/aggregates";
 import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { IS_LOCAL_HOST } from "@/env";
 
 // TODO
-// - filter transactions table by month (default this month, also allow all, or specific months)
-// - fix auto tag transaction bug
-// - savings buckets
+// - filter transactions table by month (default this month, also allow all, or specific months, or ranges)
+// - break down transactions table into accounts (tabs probably make the most sense here)
+// - migrate savings page away from old spending query
 
 export default async function Dashboard({
   searchParams,
@@ -53,7 +46,9 @@ export default async function Dashboard({
   const userWithAccount = await getUserWithToken();
   const params = await searchParams;
   const filterByTag = params.tag as string | undefined;
-  // const monthUTC = params.monthUTC as string | undefined;
+  // should be postgres-readable, eg. 2022-01-01
+  const monthUTC = params.monthUTC as string | undefined;
+
   // const pastXMonths = params.pastXMonths as string | undefined;
   if (userWithAccount === "no-plaid-account") {
     return redirect("/link");
@@ -83,22 +78,14 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  // todo: eventually this shouldn't really be necessary, but just want to see if this solves the "auto tags aren't being applied" issue
-  await tryAutoTagTransactions();
-
-  const [spendingByMonth, tsMerged, incomeQuery, spendingLast4Months] =
-    await Promise.all([
-      getSpendingByMonth({ afterXMonthsAgo: 12 }),
-      getTransactionsWithTags({ tag: filterByTag }),
-      getIncomeByMonth(),
-      getSpendingByMonth({
-        afterXMonthsAgo: 2,
-        excludeTags: ["income", "transfer"],
-      }),
-    ]);
-  const estIncomeForPeriod = Math.round(
-    parseInt(incomeQuery?.rows?.[0]?.amount ?? "", 10) * -1
-  );
+  const [tsMerged, spending] = await Promise.all([
+    getTransactionsWithTags({ tag: filterByTag }),
+    spendingForMonth({
+      monthUTC,
+      //TODO: make these configurable, save view
+      excludeTags: ["income", "transfer"],
+    }),
+  ]);
 
   return (
     <div className="flex flex-col gap-4 items-center w-full h-full">
@@ -114,19 +101,25 @@ export default async function Dashboard({
         )}
       </div>
 
-      <div className="flex flex-wrap">
-        <div className="flex flex-wrap gap-10 p-3">
-          <div className="flex flex-wrap rounded-lg pg-3 max-w-[600px]">
-            <Income taggedSpendingByPeriod={spendingByMonth.rows} />
-            <Expenses estimatedIncomeForPeriod={estIncomeForPeriod} />
-          </div>
+      <div className="flex flex-col max-w-full overflow-hidden gap-10">
+        <div>
+          <SpendingTargets
+            taggedSpendingByPeriod={
+              spending?.map((s) => ({
+                ...s,
+                is_current_month: true,
+              })) ?? []
+            }
+          />
+        </div>
+        <div className="flex">
           <Suspense>
             <NetSpendingByMonth />
           </Suspense>
-        </div>
-        {/**@ts-expect-error css modules are a pain with ts */}
-        <div className={style.chart}>
-          <SpendingChart discretionaryByMonth={spendingLast4Months.rows} />
+          {/**@ts-expect-error css modules are a pain with ts */}
+          <div className={style.chart}>
+            <SpendingChart discretionaryByMonth={spending ?? []} />
+          </div>
         </div>
 
         <div className="max-w-[1100] mx-auto hidden sm:flex flex-col gap-3">
@@ -181,7 +174,7 @@ async function NetSpendingByMonth() {
         .sort(
           (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime()
         )
-        .slice(0, 4)
+        .slice(0, 1)
         .map((r) => {
           // Parse amounts once for clarity and safety
           const income = parseInt(r.total_income, 10) || 0;
@@ -267,7 +260,6 @@ async function TagMaker() {
 
   return (
     <div>
-      <h1 className="text-lg">Tags</h1>
       <form action={createTag}>
         <input
           name="tag"
@@ -286,56 +278,7 @@ async function TagMaker() {
   );
 }
 
-async function Expenses({
-  estimatedIncomeForPeriod,
-}: {
-  estimatedIncomeForPeriod: number;
-}) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-  const expenseQuery = (await db.execute(
-    sql`
-    SELECT
-      DATE_TRUNC('month', t.date) AS month,
-      SUM(CAST(t.amount AS NUMERIC)) AS amount
-    FROM
-      transactions t
-      JOIN tags_link_new tl ON t.transaction_id = tl.transaction_id
-      JOIN tags_v2 tv ON tl.tag_id = tv.id
-    WHERE
-      t.user_id = ${user.user.id}
-      AND tv.tag IN ('expenses')
-      AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
-      AND t.date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-    GROUP BY
-      DATE_TRUNC('month', t.date);
-    `
-  )) as {
-    rows: { month: string; amount: string }[];
-  };
-  const expensesForPeriod = parseInt(expenseQuery.rows?.[0]?.amount ?? "", 10);
-  const expenseAllocation = await db.query.tagAllocations.findFirst({
-    where: eq(tagAllocations.tag, "expenses"),
-    with: { tag: true },
-  });
-  if (!expenseAllocation) {
-    return <div>No allocation</div>;
-  }
-  const targetSpending = Math.round(
-    estimatedIncomeForPeriod * (parseInt(expenseAllocation.allocation) / 100)
-  );
-  return (
-    <div>
-      target expenses: {targetSpending}, actual: {expensesForPeriod}, diff:{" "}
-      {targetSpending - expensesForPeriod}
-    </div>
-  );
-}
-
-//TODO: update to reference tags_new
-
+// todo: make this a "display for" or something, don't hardcode
 const toTrack = ["discretionary", "savings", "giving"] as const;
 
 const labelForKind: Record<TargetKind, string> = {
@@ -346,7 +289,7 @@ const labelForKind: Record<TargetKind, string> = {
 
 type TargetKind = (typeof toTrack)[number];
 
-async function Income({
+async function SpendingTargets({
   taggedSpendingByPeriod,
 }: {
   taggedSpendingByPeriod: {
@@ -417,6 +360,9 @@ async function Income({
       <div className="flex gap-5 flex-wrap">
         {toTrack.map((kind) => {
           const tag = targets[kind];
+          if (!tag) {
+            return <div key={kind}>No allocation for {kind}</div>;
+          }
           const allocation = parseInt(tag?.allocation?.allocation ?? "0", 10);
           const targetSpending = (allocation / 100) * estIncome;
           const currentSpending = parseInt(
