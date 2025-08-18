@@ -140,9 +140,15 @@ export async function autoTagTransactions(
     );
 
   const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
+  const autoTagsByMerchantName = R.indexBy(
+    autoTags,
+    (at) => at.merchant_name ?? ""
+  );
   console.log(`found some auto tags`, autoTags);
   const transactionsToAutotag = ts.reduce((acc, t) => {
-    const autoTag = autoTagsByName[t.name];
+    const autoTag =
+      autoTagsByName[t.name] ??
+      (t.merchant_name ? autoTagsByMerchantName[t.merchant_name] : undefined);
     if (!autoTag) {
       return acc;
     }

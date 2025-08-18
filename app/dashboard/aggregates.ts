@@ -1,7 +1,7 @@
 import { db } from "@/server/db";
-import { User } from "@/server/schema";
+import { tags_new, tagsLinkNew, transactions, User } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { and, sql } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import { cache } from "react";
 
 type MonthAggregate = {
@@ -77,6 +77,52 @@ export async function getSpendingByMonth(args?: SpendingByMonthArgs): Promise<{
   }
   return spendingByMonthForUser(user.user, args);
 }
+
+export const spendingForMonth = cache(
+  async ({
+    monthUTC,
+    excludeTags,
+  }: {
+    monthUTC?: string;
+    excludeTags?: string[];
+  }) => {
+    const user = await getUserWithToken();
+    if (user === "no-plaid-account") {
+      return null;
+    }
+    return await db
+      .select({
+        month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
+        amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`,
+        tag: tags_new.tag,
+        tag_id: tags_new.id,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.user_id, user.user.id),
+          monthUTC
+            ? // TODO use ranges intead of date trunc
+              sql`DATE_TRUNC('month', ${transactions.date}) = ${monthUTC}`
+            : sql`DATE_TRUNC('month', ${transactions.date}) = DATE_TRUNC('month', CURRENT_DATE)`
+        )
+      )
+      .innerJoin(
+        tagsLinkNew,
+        eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+      )
+      .innerJoin(
+        tags_new,
+        excludeTags
+          ? and(
+              eq(tags_new.id, tagsLinkNew.tag_id),
+              notInArray(tags_new.tag, excludeTags)
+            )
+          : eq(tags_new.id, tagsLinkNew.tag_id)
+      )
+      .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.id`);
+  }
+);
 
 // TODO: sql injection?
 const spendingByMonthForUser = cache(
@@ -166,6 +212,7 @@ export const getIncomeByMonth = cache(
   }
 );
 
+// TODO: rewrite this
 export const getNetSpendingByMonth = cache(async () => {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
