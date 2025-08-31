@@ -8,10 +8,11 @@ import {
   transactions,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { and, inArray, eq, or, notInArray, desc } from "drizzle-orm";
+import { and, inArray, eq, or, notInArray, desc, gte, lt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cache } from "react";
 import * as R from "remeda";
+import * as dateUtils from "@/app/utils/dates";
 
 /**developer utility, helpful when booting up a new deployment */
 export async function tagAllAsFirstTag() {
@@ -174,10 +175,19 @@ export async function autoTagTransactions(
 }
 
 export const getTransactionsWithTags = cache(
-  async (filters?: { tag?: string }) => {
+  async (filters?: { tag?: string; monthUTC?: dateUtils.YyyyMm }) => {
     const userWithAccount = await getUserWithToken();
     if (userWithAccount === "no-plaid-account") {
       return [];
+    }
+    const filterConditions = [];
+    if (filters?.monthUTC) {
+      const { start, end } = dateUtils.monthRangeUTC(filters.monthUTC);
+      filterConditions.push(gte(transactions.date, start.toISOString()));
+      filterConditions.push(lt(transactions.date, end.toISOString()));
+    }
+    if (filters?.tag) {
+      filterConditions.push(eq(tags_new.tag, filters.tag));
     }
     const ts = await db
       .select()
@@ -187,14 +197,7 @@ export const getTransactionsWithTags = cache(
         eq(transactions.transaction_id, tagsLinkNew.transaction_id)
       )
       .leftJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
-      .where(
-        filters?.tag
-          ? and(
-              eq(transactions.user_id, userWithAccount.user.id),
-              eq(tags_new.tag, filters.tag)
-            )
-          : eq(transactions.user_id, userWithAccount.user.id)
-      )
+      .where(and(...filterConditions))
       .orderBy(desc(transactions.date), transactions.merchant_name);
 
     return Object.values(

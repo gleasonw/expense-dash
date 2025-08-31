@@ -32,6 +32,7 @@ import {
 } from "@/app/dashboard/aggregates";
 import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { IS_LOCAL_HOST } from "@/env";
+import * as dateUtils from "@/app/utils/dates";
 
 // TODO
 // - filter transactions table by month (default this month, also allow all, or specific months, or ranges)
@@ -47,7 +48,10 @@ export default async function Dashboard({
   const params = await searchParams;
   const filterByTag = params.tag as string | undefined;
   // should be postgres-readable, eg. 2022-01-01
-  const monthUTC = params.monthUTC as string | undefined;
+  const mParam = (await searchParams).monthUTC;
+  const mParamString = typeof mParam === "string" ? mParam : undefined;
+  const monthUTC = dateUtils.normYyyyMm(mParamString);
+  console.log({ monthUTC });
 
   // const pastXMonths = params.pastXMonths as string | undefined;
   if (userWithAccount === "no-plaid-account") {
@@ -79,7 +83,7 @@ export default async function Dashboard({
   await Promise.allSettled(operationsToRun);
 
   const [tsMerged, spending] = await Promise.all([
-    getTransactionsWithTags({ tag: filterByTag }),
+    getTransactionsWithTags({ tag: filterByTag, monthUTC }),
     spendingForMonth({
       monthUTC,
       //TODO: make these configurable, save view

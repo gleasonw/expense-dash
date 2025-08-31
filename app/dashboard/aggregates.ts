@@ -212,7 +212,9 @@ export const getIncomeByMonth = cache(
   }
 );
 
-// TODO: rewrite this
+// TODO: rewrite this using full drizzle
+// I think we can use with clause
+// https://orm.drizzle.team/docs/select#with-clause
 export const getNetSpendingByMonth = cache(async () => {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
