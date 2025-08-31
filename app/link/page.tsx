@@ -17,7 +17,6 @@ export default async function Link() {
       redirect_uri: process.env.PLAID_REDIRECT_URI,
     });
   } catch (e) {
-    console.error(e.response);
     if (e instanceof Error) {
       console.log(e.message);
     }
