@@ -272,9 +272,9 @@ export const getNetSpendingByMonth = cache(async () => {
       // oddly, drizzle won't auto alias, so to avoid ambiguity we have to manually alias
       // https://github.com/drizzle-team/drizzle-orm/issues/2772
       month: sql<string>`COALESCE(mi.month, ms.month) as month`,
-      total_income: sql<number>`COALESCE(mi.total_income, 0) as total_income`,
-      total_spending: sql<number>`COALESCE(ms.total_spending, 0) as total_spending`,
-      net_amount: sql<number>`
+      total_income: sql<string>`COALESCE(mi.total_income, 0) as total_income`,
+      total_spending: sql<string>`COALESCE(ms.total_spending, 0) as total_spending`,
+      net_amount: sql<string>`
     COALESCE(mi.total_income, 0)
     + COALESCE(ms.total_spending, 0) as net_amount
   `,
