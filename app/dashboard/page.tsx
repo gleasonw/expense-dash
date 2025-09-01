@@ -170,7 +170,8 @@ async function NetSpendingByMonth() {
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
-  const { rows } = await getNetSpendingByMonth();
+  const rows = await getNetSpendingByMonth();
+  console.log({ rows });
   return (
     <div className="grid grid-cols-2 md:flex gap-3 flex-wrap">
       {rows
