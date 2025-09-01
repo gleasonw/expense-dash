@@ -1,7 +1,7 @@
 import { db } from "@/server/db";
 import { tags_new, tagsLinkNew, transactions, User } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { and, eq, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { cache } from "react";
 
 type MonthAggregate = {
@@ -212,65 +212,74 @@ export const getIncomeByMonth = cache(
   }
 );
 
-// TODO: rewrite this using full drizzle
-// I think we can use with clause
-// https://orm.drizzle.team/docs/select#with-clause
 export const getNetSpendingByMonth = cache(async () => {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
-    return { rows: [] };
+    return [];
   }
-  return (await db.execute(`
-     WITH monthly_income AS (
-      -- Calculate total income per month
-      SELECT
-        DATE_TRUNC('month', t.date) AS month,
-        SUM(CAST(t.amount AS NUMERIC)) * -1 AS total_income
-      FROM
-        transactions t
-      JOIN tags_link_new tl ON t.transaction_id = tl.transaction_id
-      JOIN tags_v2 tv ON tl.tag_id = tv.id
-      WHERE
-        t.user_id = ${user.user.id}
-        AND tv.tag = 'income' -- Only include transactions tagged as 'income'
-      GROUP BY
-        DATE_TRUNC('month', t.date)
-    ), monthly_spending AS (
-      -- Calculate total spending per month (your original query logic)
-      SELECT
-        DATE_TRUNC('month', t.date) AS month,
-        SUM(CAST(t.amount AS NUMERIC)) AS total_spending
-      FROM
-        transactions t
-      WHERE
-        t.user_id = ${user.user.id}
-        AND t.transaction_id IN (
-          SELECT DISTINCT tl.transaction_id
-          FROM tags_link_new tl
-          JOIN tags_v2 tv ON tl.tag_id = tv.id
-          WHERE tv.tag NOT IN ('income', 'transfer') -- Exclude income & transfers
-        )
-      GROUP BY
-        DATE_TRUNC('month', t.date)
+  const incomeSubquery = db
+    .select({
+      month: sql<string>`DATE_TRUNC('month', ${transactions.date})`.as("month"),
+      total_income:
+        sql<number>`SUM(CAST(${transactions.amount} AS NUMERIC)) * -1`.as(
+          "total_income"
+        ),
+    })
+    .from(transactions)
+    .innerJoin(
+      tagsLinkNew,
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
     )
-    -- Combine income and spending, calculate net
-    SELECT
-      COALESCE(mi.month, ms.month) AS month, -- Use COALESCE in case a month has only income or only spending
-      COALESCE(mi.total_income, 0) AS total_income,
-      COALESCE(ms.total_spending, 0) AS total_spending,
-      (COALESCE(mi.total_income, 0) - COALESCE(ms.total_spending, 0)) AS net_amount
-    FROM
-      monthly_income mi
-    FULL OUTER JOIN -- Use FULL OUTER JOIN to include months with only income or only spending
-      monthly_spending ms ON mi.month = ms.month
-    ORDER BY
-      month ASC;
-`)) as {
-    rows: {
-      month: string;
-      total_income: string;
-      total_spending: string;
-      net_amount: string;
-    }[];
-  };
+    .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+    .where(
+      and(eq(transactions.user_id, user.user.id), eq(tags_new.tag, "income"))
+    )
+    .groupBy(sql`DATE_TRUNC('month', ${transactions.date})`)
+    .as("mi");
+
+  const spendSubquery = db
+    .select({
+      month: sql<string>`DATE_TRUNC('month', ${transactions.date})`.as("month"),
+      total_spending:
+        sql<number>`SUM(CAST(${transactions.amount} AS NUMERIC)) * -1`.as(
+          "total_spending"
+        ),
+    })
+    .from(transactions)
+    .innerJoin(
+      tagsLinkNew,
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+    )
+    .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+    .where(
+      and(
+        eq(transactions.user_id, user.user.id),
+        inArray(
+          transactions.transaction_id,
+          db
+            .selectDistinct({ id: tagsLinkNew.transaction_id })
+            .from(tagsLinkNew)
+            .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+            .where(notInArray(tags_new.tag, ["income", "transfer"]))
+        )
+      )
+    )
+    .groupBy(sql`DATE_TRUNC('month', ${transactions.date})`)
+    .as("ms");
+
+  return await db
+    .select({
+      // oddly, drizzle won't auto alias, so to avoid ambiguity we have to manually alias
+      // https://github.com/drizzle-team/drizzle-orm/issues/2772
+      month: sql<string>`COALESCE(mi.month, ms.month) as month`,
+      total_income: sql<number>`COALESCE(mi.total_income, 0) as total_income`,
+      total_spending: sql<number>`COALESCE(ms.total_spending, 0) as total_spending`,
+      net_amount: sql<number>`
+    COALESCE(mi.total_income, 0)
+    + COALESCE(ms.total_spending, 0) as net_amount
+  `,
+    })
+    .from(incomeSubquery)
+    .fullJoin(spendSubquery, eq(sql`mi.month`, sql`ms.month`))
+    .orderBy(asc(sql`COALESCE(mi.month, ms.month)`));
 });
