@@ -35,6 +35,9 @@ export default async function RootLayout({
         <Link href="/dashboard/savings">
           <button className="p-2 border hover:bg-gray-200">Savings</button>
         </Link>
+        <Link href="/dashboard/tags">
+          <button className="p-2 border hover:bg-gray-200">Tags</button>
+        </Link>
         <ReactQueryProvider>{children}</ReactQueryProvider>
       </body>
     </html>

@@ -1,15 +1,11 @@
-import {
-  addTransactions,
-  createTag,
-  setTagAllocation,
-} from "@/app/dashboard/actions";
+import { addTransactions, setTagAllocation } from "@/app/dashboard/actions";
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { SpendingTable } from "@/app/dashboard/SpendingTable";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
 import { userTable, tags_new, Tag, TagAllocation } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
@@ -25,7 +21,6 @@ import {
   formatCurrency,
   toAppTransaction,
 } from "@/app/dashboard/transaction_utils";
-import { Suspense } from "react";
 import {
   getNetSpendingByMonth,
   spendingForMonth,
@@ -36,9 +31,13 @@ import * as dateUtils from "@/app/utils/dates";
 import { MonthPicker } from "@/app/dashboard/MonthPicker";
 
 // TODO
-// - filter transactions table by month (default this month, also allow all, or specific months, or ranges)
-// - break down transactions table into accounts (tabs probably make the most sense here)
-// - migrate savings page away from old spending query
+// make the color of tags fixed, maybe also add an icon, use that across
+// Range: MonthRangePicker (quick presets: YTD, last 3/6/12, custom)
+//  - in range view, net spending by month chart
+//  - in range view, net spending by this tag by month chart
+// make single month spending by tag a donut
+// break down transactions table into accounts (tabs probably make the most sense here)
+// migrate savings page away from old spending query
 
 export default async function Dashboard({
   searchParams,
@@ -83,18 +82,48 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  const [tsMerged, spending] = await Promise.all([
+  const [tsMerged, spending, netSpendForMonth] = await Promise.all([
     getTransactionsWithTags({ tag: filterByTag, monthUTC }),
     spendingForMonth({
       monthUTC,
       //TODO: make these configurable, save view
       excludeTags: ["income", "transfer"],
     }),
+    getNetSpendingByMonth({ monthUTC }),
   ]);
 
+  const netSpendForSelectedMonth = netSpendForMonth?.at(0);
+
   return (
-    <div className="flex flex-col gap-4 items-center w-full h-full">
-      <div className="border shadow-lg w-full p-3 flex items-center justify-center flex-wrap">
+    <div className="flex flex-col gap-4 w-full h-full px-4">
+      <div className="flex gap-2 w-full items-center justify-center">
+        <MonthPicker monthUTC={monthUTC} />
+        <div className="flex p-1 flex-col gap-2">
+          <div className="flex flex-col text-right">
+            <span>${netSpendForSelectedMonth?.total_income}</span>
+            <span>${netSpendForSelectedMonth?.total_spending}</span>
+          </div>
+          <div
+            className={`flex flex-col text-lg ${
+              Number(netSpendForSelectedMonth?.net_amount) < 0
+                ? "text-red-700"
+                : "text-green-700"
+            }`}
+          >
+            <span
+              className={`p-3 ${
+                Number(netSpendForSelectedMonth?.net_amount) > 0
+                  ? "bg-green-200"
+                  : "bg-red-200"
+              }`}
+            >
+              ${netSpendForSelectedMonth?.net_amount}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="border w-full p-3 flex items-center justify-center flex-wrap">
         <SpendingCategorizer
           transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
         />
@@ -105,23 +134,16 @@ export default async function Dashboard({
           <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
         )}
       </div>
-      <MonthPicker monthUTC={monthUTC} />
-
       <div className="flex flex-col max-w-full overflow-hidden gap-10">
-        <div>
-          <SpendingTargets
-            taggedSpendingByPeriod={
-              spending?.map((s) => ({
-                ...s,
-                is_current_month: true,
-              })) ?? []
-            }
-          />
-        </div>
+        <SpendingTargets
+          taggedSpendingByPeriod={
+            spending?.map((s) => ({
+              ...s,
+              is_current_month: true,
+            })) ?? []
+          }
+        />
         <div className="flex">
-          <Suspense>
-            <NetSpendingByMonth monthUTC={monthUTC} />
-          </Suspense>
           {/**@ts-expect-error css modules are a pain with ts */}
           <div className={style.chart}>
             <SpendingChart discretionaryByMonth={spending ?? []} />
@@ -129,7 +151,6 @@ export default async function Dashboard({
         </div>
 
         <div className="max-w-[1100] mx-auto hidden sm:flex flex-col gap-3">
-          <TagMaker />
           <TransactionFilters />
           <SpendingTable rows={tsMerged} />
         </div>
@@ -167,80 +188,6 @@ export default async function Dashboard({
   );
 }
 
-async function NetSpendingByMonth({
-  monthUTC,
-}: {
-  monthUTC: dateUtils.YyyyMm;
-}) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-  const rows = await getNetSpendingByMonth({ monthUTC });
-  console.log({ rows });
-  return (
-    <div className="grid grid-cols-2 md:flex gap-3 flex-wrap">
-      {rows
-        .slice()
-        .sort(
-          (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime()
-        )
-        .slice(0, 1)
-        .map((r) => {
-          // Parse amounts once for clarity and safety
-          const income = parseInt(r.total_income, 10) || 0;
-          const spending = parseInt(r.total_spending, 10) || 0;
-          const net = parseInt(r.net_amount, 10) || 0;
-
-          // Determine the color class based on the net amount
-          const netColorClass =
-            net > 0
-              ? "text-green-600" // Surplus
-              : net < 0
-              ? "text-red-600" // Deficit
-              : "text-black"; // Zero or default
-
-          return (
-            <div
-              key={r.month} // Assuming r.month is unique and stable (like '2023-10-01T00:00:00.000Z')
-              className="flex w-48 flex-col gap-2 rounded border bg-white p-4 shadow-lg" // Added width, rounded corners, adjusted gap/padding
-            >
-              {/* Format the month nicely */}
-              <span className="mb-2 text-center font-semibold text-gray-700">
-                {new Date(r.month).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  timeZone: "UTC",
-                })}
-              </span>
-              <Label text={"Income"} className="text-md">
-                {" "}
-                {/* Adjusted size */}
-                <span className="text-right font-medium">
-                  {formatCurrency(income)}
-                </span>
-              </Label>
-              <Label text={"Spending"} className="text-md">
-                <span className="text-right font-medium">
-                  {formatCurrency(spending)}
-                </span>
-              </Label>
-              <hr className="my-1" /> {/* Optional separator */}
-              <Label text={"Net"} className="text-md font-semibold">
-                {" "}
-                {/* Make Net label bold */}
-                {/* Apply the conditional color class */}
-                <span className={`text-right font-bold ${netColorClass}`}>
-                  {formatCurrency(net)}
-                </span>
-              </Label>
-            </div>
-          );
-        })}
-    </div>
-  );
-}
-
 async function TransactionFilters() {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
@@ -259,32 +206,6 @@ async function TransactionFilters() {
       <Link href={`/dashboard`}>
         <div className="p-2 border hover:bg-gray-200">All</div>
       </Link>
-    </div>
-  );
-}
-
-async function TagMaker() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-
-  return (
-    <div>
-      <form action={createTag}>
-        <input
-          name="tag"
-          type="text"
-          className="border rounded-md shadow-sm"
-          placeholder="tag"
-        />
-
-        <button type="submit" className="p-2 border hover:bg-gray-200">
-          Create
-        </button>
-      </form>
-
-      <form></form>
     </div>
   );
 }
@@ -328,33 +249,25 @@ async function SpendingTargets({
     return acc;
   }, {} as Record<TargetKind, Tag & { allocation: TagAllocation | null }>);
 
-  const estimatedIncomeAndExpenses = (await db.execute(
-    sql`
-    SELECT
-      DATE_TRUNC('month', t.date) AS month,
-      SUM(CAST(t.amount AS NUMERIC)) AS amount,
-      tv.tag
-    FROM
-        transactions t
-    JOIN
-        tags_link_new tl ON t.transaction_id = tl.transaction_id
-    JOIN tags_v2 tv ON tl.tag_id = tv.id
-        WHERE
-        t.user_id = ${user.user.id}
-        AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
-        AND tv.tag in ('income', 'expenses')
-    GROUP BY
-        DATE_TRUNC('month', t.date), tv.tag
-    ORDER BY
-        month;
-`
-  )) as { rows: { month: string; amount: string; tag: string }[] };
+  const estimatedIncomeAndExpenses = await spendingForMonth({
+    monthUTC: `${new Date().getUTCFullYear()}-${String(
+      new Date().getUTCMonth()
+    ).padStart(2, "0")}-01`,
+  });
+
+  if (!estimatedIncomeAndExpenses) {
+    return null;
+  }
+
+  if (estimatedIncomeAndExpenses?.length === 0) {
+    return null;
+  }
 
   const currentPeriodSpending = taggedSpendingByPeriod.filter(
     (t) => t.is_current_month
   );
 
-  const { income } = R.groupBy(estimatedIncomeAndExpenses.rows, (r) => r.tag);
+  const { income } = R.groupBy(estimatedIncomeAndExpenses, (r) => r.tag);
 
   const currentPeriodSpendingByTag = R.indexBy(
     currentPeriodSpending,
@@ -364,11 +277,13 @@ async function SpendingTargets({
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
 
   return (
-    <div className="flex flex-col gap-5">
-      <Label text="Est. Income">
-        <span>${estIncome}</span>
-      </Label>
-      <div className="flex gap-5 flex-wrap">
+    <div className="flex flex-col gap-5 w-full">
+      <div className="flex">
+        <Label text="Est. Income">
+          <span>${estIncome}</span>
+        </Label>
+      </div>
+      <div className="flex gap-10 flex-wrap">
         {toTrack.map((kind) => {
           const tag = targets[kind];
           if (!tag) {
@@ -381,50 +296,63 @@ async function SpendingTargets({
           );
           return (
             <div
-              className="flex border shadow-lg p-3 gap-5 flex-col bg-white"
+              className="flex-col gap-3 bg-white max-w-[500px] w-full"
               key={kind}
             >
-              <div className="text-lg text-gray-500">{labelForKind[kind]}</div>
-              <form
-                action={setTagAllocation}
-                className="flex items-center gap-2"
-              >
-                <input
-                  type="text"
-                  name={tag.id}
-                  defaultValue={allocation}
-                  className="w-12"
-                />
-                <span>%</span>
-                <button type="submit" className="shadow-sm  rounded px-2 py-1">
-                  update
-                </button>
-              </form>
-              <div className="text-xs">
-                ${currentSpending} / ${Math.round(targetSpending)}
+              <div className="flex gap-2 justify-between">
+                <div>{labelForKind[kind]}</div>
+
+                <form
+                  action={setTagAllocation}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    name={tag.id}
+                    defaultValue={allocation}
+                    className="w-8"
+                  />
+                  <span>%</span>
+                  <button
+                    type="submit"
+                    className="shadow-sm  rounded px-2 py-1"
+                  >
+                    update
+                  </button>
+                </form>
               </div>
-              <div className="w-full h-6 overflow-hidden border rounded">
-                <div
-                  className={`bg-blue-500 relative h-full`}
-                  style={{
-                    width: `${(currentSpending / targetSpending) * 100}%`,
-                  }}
-                ></div>
+              <div className="flex flex-col gap-2">
+                <div className="text-xs">
+                  ${currentSpending} / ${Math.round(targetSpending)}
+                </div>
+                <div className="w-full h-6 overflow-hidden border rounded">
+                  <div
+                    className={`bg-blue-500 relative h-full`}
+                    style={{
+                      width: `${(currentSpending / targetSpending) * 100}%`,
+                      background: tag.color,
+                    }}
+                  ></div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="text-xl">
+                    {isNaN(currentSpending) ? (
+                      <span className="text-right">
+                        ${targetSpending.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-right">
+                        ${Math.round(targetSpending - currentSpending)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-gray-500 text-sm">to spend</span>
+                </div>
               </div>
-              <Label text="To spend" className="text-3xl">
-                {isNaN(currentSpending) ? (
-                  <span className="text-right">
-                    ${targetSpending.toFixed(2)}
-                  </span>
-                ) : (
-                  <span className="text-right">
-                    ${Math.round(targetSpending - currentSpending)}
-                  </span>
-                )}
-              </Label>
             </div>
           );
         })}
+        <div>TODO: create new target for tag</div>
       </div>
     </div>
   );

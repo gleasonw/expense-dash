@@ -150,6 +150,7 @@ function TransactionRow({ transaction }: { transaction: TransactionWithTags }) {
                     tagId: tag.id,
                   })
                 }
+                style={{ border: `3px solid ${tag.color}` }}
                 className="bg-gray-200 text-gray-800 px-2 py-1 rounded-md flex justify-between"
               >
                 {tag.tag}

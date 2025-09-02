@@ -3,16 +3,7 @@ import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { db } from "@/server/db";
 import { tags_new, tagsLinkNew, transactions, User } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import {
-  and,
-  asc,
-  eq,
-  exists,
-  inArray,
-  notExists,
-  notInArray,
-  sql,
-} from "drizzle-orm";
+import { and, asc, eq, exists, inArray, notExists, sql } from "drizzle-orm";
 import { cache } from "react";
 
 type MonthAggregate = {
@@ -94,43 +85,29 @@ export const spendingForMonth = cache(
     monthUTC,
     excludeTags,
   }: {
-    monthUTC?: string;
+    monthUTC?: YyyyMm;
     excludeTags?: string[];
   }) => {
     const user = await getUserWithToken();
     if (user === "no-plaid-account") {
       return null;
     }
+    const filterConditions = getFilterConditions({ monthUTC, excludeTags });
     return await db
       .select({
         month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
         amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`,
         tag: tags_new.tag,
         tag_id: tags_new.id,
+        color: tags_new.color,
       })
       .from(transactions)
-      .where(
-        and(
-          eq(transactions.user_id, user.user.id),
-          monthUTC
-            ? // TODO use ranges intead of date trunc
-              sql`DATE_TRUNC('month', ${transactions.date}) = ${monthUTC}`
-            : sql`DATE_TRUNC('month', ${transactions.date}) = DATE_TRUNC('month', CURRENT_DATE)`
-        )
-      )
       .innerJoin(
         tagsLinkNew,
         eq(transactions.transaction_id, tagsLinkNew.transaction_id)
       )
-      .innerJoin(
-        tags_new,
-        excludeTags
-          ? and(
-              eq(tags_new.id, tagsLinkNew.tag_id),
-              notInArray(tags_new.tag, excludeTags)
-            )
-          : eq(tags_new.id, tagsLinkNew.tag_id)
-      )
+      .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+      .where(and(eq(transactions.user_id, user.user.id), ...filterConditions))
       .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.id`);
   }
 );
