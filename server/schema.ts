@@ -346,4 +346,5 @@ export type Bucket = InferSelectModel<typeof buckets>;
 export type PostMovement = InferInsertModel<typeof bucketMovements>;
 export type Movement = InferSelectModel<typeof bucketMovements>;
 export type Tag = InferSelectModel<typeof tags_new>;
+export type UpdateTag = InferInsertModel<typeof tags_new>;
 export type TagAllocation = InferSelectModel<typeof tagAllocationsNew>;

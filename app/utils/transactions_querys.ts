@@ -1,15 +1,33 @@
 import * as dateUtils from "@/app/utils/dates";
-import { transactions } from "@/server/schema";
-import { gte, lt } from "drizzle-orm";
+import { db } from "@/server/db";
+import { tags_new, tagsLinkNew, transactions } from "@/server/schema";
+import { and, eq, gte, inArray, lt, notExists, sql } from "drizzle-orm";
 
+/** filters expected to apply directly onto the transactions table */
 export function getFilterConditions(
-  filters: { monthUTC?: dateUtils.YyyyMm } | undefined
+  filters: { monthUTC?: dateUtils.YyyyMm; excludeTags?: string[] } | undefined
 ) {
   const filterConditions = [];
   if (filters?.monthUTC) {
     const { start, end } = dateUtils.monthRangeUTC(filters.monthUTC);
     filterConditions.push(gte(transactions.date, start.toISOString()));
     filterConditions.push(lt(transactions.date, end.toISOString()));
+  }
+  if (filters?.excludeTags && filters.excludeTags.length > 0) {
+    filterConditions.push(
+      notExists(
+        db
+          .select({ one: sql`1` })
+          .from(tagsLinkNew)
+          .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+          .where(
+            and(
+              eq(tagsLinkNew.transaction_id, transactions.transaction_id),
+              inArray(tags_new.tag, filters.excludeTags)
+            )
+          )
+      )
+    );
   }
   return filterConditions;
 }

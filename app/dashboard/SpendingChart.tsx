@@ -9,24 +9,25 @@ type SpendingChartProps = {
     month: string;
     tag: string;
     amount: string;
+    color: string;
   }>;
 };
 
 export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
   const highchartsConfig = useMemo(() => {
-    // Group data by month and tag
+    // Group data by tag
     const groupedData = discretionaryByMonth.reduce((acc, row) => {
-      const month = row.month.substring(0, 7); // Extract year-month
+      const month = row.month.substring(0, 7); // year-month
       const tag = row.tag;
       const spending = parseFloat(row.amount);
 
       if (!acc[tag]) {
-        acc[tag] = [];
+        acc[tag] = { data: [], color: row.color };
       }
 
-      acc[tag].push({ name: month, y: spending });
+      acc[tag].data.push({ name: month, y: spending });
       return acc;
-    }, {} as Record<string, Array<{ name: string; y: number }>>);
+    }, {} as Record<string, { data: Array<{ name: string; y: number }>; color: string }>);
 
     return {
       chart: {
@@ -39,9 +40,7 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
       },
       xAxis: {
         type: "category",
-        title: {
-          text: "Month",
-        },
+        title: { text: "Month" },
         labels: {
           rotation: -45,
           align: "right",
@@ -52,9 +51,7 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
         },
       },
       yAxis: {
-        title: {
-          text: "Total Spending",
-        },
+        title: { text: "Total Spending" },
       },
       tooltip: {
         pointFormat:
@@ -62,8 +59,6 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
       },
       plotOptions: {
         column: {
-          stacking: undefined,
-          grouping: "normal",
           dataLabels: {
             enabled: true,
             format: "${point.y:.2f}",
@@ -75,9 +70,10 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
           },
         },
       },
-      series: Object.entries(groupedData).map(([tag, data]) => ({
+      series: Object.entries(groupedData).map(([tag, { data, color }]) => ({
         name: tag,
         data,
+        color,
       })),
     };
   }, [discretionaryByMonth]);
