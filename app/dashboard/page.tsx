@@ -33,6 +33,7 @@ import {
 import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { IS_LOCAL_HOST } from "@/env";
 import * as dateUtils from "@/app/utils/dates";
+import { MonthPicker } from "@/app/dashboard/MonthPicker";
 
 // TODO
 // - filter transactions table by month (default this month, also allow all, or specific months, or ranges)
@@ -104,6 +105,7 @@ export default async function Dashboard({
           <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
         )}
       </div>
+      <MonthPicker monthUTC={monthUTC} />
 
       <div className="flex flex-col max-w-full overflow-hidden gap-10">
         <div>
