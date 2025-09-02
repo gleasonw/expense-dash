@@ -108,7 +108,10 @@ export const spendingForMonth = cache(
       )
       .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
       .where(and(eq(transactions.user_id, user.user.id), ...filterConditions))
-      .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.id`);
+      .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.id`)
+      .orderBy(
+        sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.label, tags_v2.id`
+      );
   }
 );
 
