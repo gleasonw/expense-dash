@@ -118,7 +118,7 @@ export default async function Dashboard({
         </div>
         <div className="flex">
           <Suspense>
-            <NetSpendingByMonth />
+            <NetSpendingByMonth monthUTC={monthUTC} />
           </Suspense>
           {/**@ts-expect-error css modules are a pain with ts */}
           <div className={style.chart}>
@@ -165,12 +165,16 @@ export default async function Dashboard({
   );
 }
 
-async function NetSpendingByMonth() {
+async function NetSpendingByMonth({
+  monthUTC,
+}: {
+  monthUTC: dateUtils.YyyyMm;
+}) {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
-  const rows = await getNetSpendingByMonth();
+  const rows = await getNetSpendingByMonth({ monthUTC });
   console.log({ rows });
   return (
     <div className="grid grid-cols-2 md:flex gap-3 flex-wrap">
