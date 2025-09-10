@@ -1,11 +1,16 @@
-import { addTransactions, setTagAllocation } from "@/app/dashboard/actions";
+import { addTransactions } from "@/app/dashboard/actions";
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
-import { SpendingTable } from "@/app/dashboard/SpendingTable";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
-import { userTable, tags_new, Tag, TagAllocation } from "@/server/schema";
+import {
+  userTable,
+  tags_new,
+  tagsLinkNew,
+  transactions,
+  tagAllocationsNew,
+} from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lt, notInArray, sql } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
@@ -29,13 +34,14 @@ import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { IS_LOCAL_HOST } from "@/env";
 import * as dateUtils from "@/app/utils/dates";
 import { MonthPicker } from "@/app/dashboard/MonthPicker";
+import { TransactionDateEditor } from "@/app/dashboard/SpendingTable";
+import { getFilterConditions } from "@/app/utils/transactions_querys";
+import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
+import { RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 
 // TODO
-// make the color of tags fixed, maybe also add an icon, use that across
-// Range: MonthRangePicker (quick presets: YTD, last 3/6/12, custom)
-//  - in range view, net spending by month chart
-//  - in range view, net spending by this tag by month chart
-// make single month spending by tag a donut
+// fix bugs in allocations zone
+// make the KPI zone more explicit: estimated income, total spending, net
 // break down transactions table into accounts (tabs probably make the most sense here)
 // migrate savings page away from old spending query
 
@@ -95,10 +101,10 @@ export default async function Dashboard({
   const netSpendForSelectedMonth = netSpendForMonth?.at(0);
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full px-4">
-      <div className="flex gap-2 w-full items-center justify-center">
+    <div className="flex flex-col sm:grid grid-cols-2 grid-rows-[auto_1fr] gap-5 max-h-full h-full overflow-hidden">
+      <div className="flex gap-2 w-full col-span-2">
         <MonthPicker monthUTC={monthUTC} />
-        <div className="flex p-1 flex-col gap-2">
+        <div className="flex p-1 gap-5">
           <div className="flex flex-col text-right">
             <span>${netSpendForSelectedMonth?.total_income}</span>
             <span>${netSpendForSelectedMonth?.total_spending}</span>
@@ -123,65 +129,59 @@ export default async function Dashboard({
         </div>
       </div>
 
-      <div className="border w-full p-3 flex items-center justify-center flex-wrap">
-        <SpendingCategorizer
-          transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
-        />
-        <button className="border" onClick={tryAutoTagTransactions}>
-          Autotag transactions
-        </button>
-        {IS_LOCAL_HOST && (
-          <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
-        )}
-      </div>
-      <div className="flex flex-col max-w-full overflow-hidden gap-10">
-        <SpendingTargets
-          taggedSpendingByPeriod={
-            spending?.map((s) => ({
-              ...s,
-              is_current_month: true,
-            })) ?? []
-          }
-        />
-        <div className="flex">
-          {/**@ts-expect-error css modules are a pain with ts */}
-          <div className={style.chart}>
-            <SpendingChart discretionaryByMonth={spending ?? []} />
-          </div>
-        </div>
-
-        <div className="max-w-[1100] mx-auto hidden sm:flex flex-col gap-3">
-          <TransactionFilters />
-          <SpendingTable rows={tsMerged} />
-        </div>
-        <div className="w-full flex sm:hidden flex-col">
+      <div className="flex flex-col max-h-full overflow-hidden gap-5">
+        <FeatureBox className="max-h-[400px] h-60 overflow-auto ">
+          <SpendingCategorizer
+            transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
+          />
+          <button className="border" onClick={tryAutoTagTransactions}>
+            Autotag transactions
+          </button>
+          {IS_LOCAL_HOST && (
+            <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
+          )}
+        </FeatureBox>
+        <FeatureBox className="overflow-auto max-h-[400px] sm:max-h-full flex flex-col">
           <TransactionFilters />
           {tsMerged.map((t) => (
             <div
               key={t.transaction_id}
-              className="p-3 border-b hover:bg-gray-100"
+              className="p-3 border-b hover:bg-gray-100 flex flex-col"
             >
-              <span className="font-semibold">{t.name}</span>
-              <span className="text-gray-600">
-                {" "}
-                - {formatCurrency(t.amount)}
-              </span>
-              <span className="text-gray-500">
-                {" "}
-                - {new Date(t.date).toLocaleDateString()}
-              </span>
+              <div className="flex justify-between">
+                <span className="font-semibold">{t.name}</span>
+                <div className="flex flex-col items-end">
+                  <span className="text-gray-600">
+                    {formatCurrency(t.amount)}
+                  </span>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {t.tags.map((tag) => (
-                  <span
-                    key={tag.tag}
-                    className="bg-blue-200 text-blue-800 px-2 py-1 rounded-md"
-                  >
+                  <RemoveTagButton key={tag.tag} transaction={t} tag={tag}>
                     {tag.tag}
-                  </span>
+                  </RemoveTagButton>
                 ))}
+                <div className="ml-auto">
+                  <TransactionDateEditor
+                    date={new Date(t.date)}
+                    transaction={t}
+                  />
+                </div>
               </div>
             </div>
           ))}
+        </FeatureBox>
+      </div>
+      <div className="flex flex-col gap-5">
+        <FeatureBox className="col-start-2 row-start-2 row-span-2">
+          <SpendingTargets />
+        </FeatureBox>
+        <div className="hidden sm:flex">
+          {/**@ts-expect-error css modules are a pain with ts */}
+          <div className={style.chart}>
+            <SpendingChart discretionaryByMonth={spending ?? []} />
+          </div>
         </div>
       </div>
     </div>
@@ -210,44 +210,58 @@ async function TransactionFilters() {
   );
 }
 
-// todo: make this a "display for" or something, don't hardcode
-const toTrack = ["discretionary", "savings", "giving"] as const;
-
-const labelForKind: Record<TargetKind, string> = {
-  discretionary: "Discretionary",
-  giving: "Giving",
-  savings: "Savings",
-};
-
-type TargetKind = (typeof toTrack)[number];
-
-async function SpendingTargets({
-  taggedSpendingByPeriod,
-}: {
-  taggedSpendingByPeriod: {
-    month: string;
-    amount: string;
-    tag: string;
-    is_current_month: boolean;
-  }[];
-}) {
+async function SpendingTargets({ monthUTC }: { monthUTC?: string }) {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
-  const allTags = await db.query.tags_new.findMany({
-    with: { allocation: true },
+  const monthFilters = getFilterConditions({
+    monthUTC: dateUtils.normYyyyMm(monthUTC),
   });
-  const tagsTracked = allTags.filter((t) =>
-    toTrack.includes(t.tag as TargetKind)
-  );
-  const targets = tagsTracked.reduce((acc, t) => {
-    if (isNaN(parseInt(t.allocation?.allocation))) {
-      return acc;
-    }
-    acc[t.tag as TargetKind] = t;
-    return acc;
-  }, {} as Record<TargetKind, Tag & { allocation: TagAllocation | null }>);
+  if (monthFilters.length === 0) {
+    monthFilters.push(
+      gte(transactions.date, sql`date_trunc('month', CURRENT_DATE)`)
+    );
+    monthFilters.push(
+      lt(
+        transactions.date,
+        sql`date_trunc('month', CURRENT_DATE + INTERVAL '1 month')`
+      )
+    );
+  }
+  const taggedSpendingByPeriod = await db
+    .select({
+      month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
+      amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`,
+      tag: tags_new.tag,
+      tagId: tags_new.id,
+      label: tags_new.label,
+      tag_id: tags_new.id,
+      color: tags_new.color,
+      allocation: tagAllocationsNew.allocation,
+    })
+    .from(transactions)
+    .innerJoin(
+      tagsLinkNew,
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+    )
+    .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+    .leftJoin(tagAllocationsNew, eq(tagAllocationsNew.tag_id, tags_new.id))
+    .where(
+      and(
+        eq(transactions.user_id, user.user.id),
+        notInArray(tags_new.tag, ["income", "transfer"]),
+        ...monthFilters
+      )
+    )
+    .groupBy(
+      sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.id, ${tagAllocationsNew.allocation}`
+    )
+    .orderBy(
+      sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.label, tags_v2.id`
+    );
+
+  console.log({ taggedSpendingByPeriod });
 
   const estimatedIncomeAndExpenses = await spendingForMonth({
     monthUTC: `${new Date().getUTCFullYear()}-${String(
@@ -263,97 +277,81 @@ async function SpendingTargets({
     return null;
   }
 
-  const currentPeriodSpending = taggedSpendingByPeriod.filter(
-    (t) => t.is_current_month
-  );
-
   const { income } = R.groupBy(estimatedIncomeAndExpenses, (r) => r.tag);
-
-  const currentPeriodSpendingByTag = R.indexBy(
-    currentPeriodSpending,
-    (s) => s.tag
-  );
-
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
+  const toTrack = taggedSpendingByPeriod.filter((t) => t.allocation !== null);
+
+  const allUserTags = await db.query.tags_new.findMany({
+    where: eq(tags_new.userId, user.user.id),
+  });
 
   return (
     <div className="flex flex-col gap-5 w-full">
-      <div className="flex">
-        <Label text="Est. Income">
-          <span>${estIncome}</span>
-        </Label>
-      </div>
-      <div className="flex gap-10 flex-wrap">
-        {toTrack.map((kind) => {
-          const tag = targets[kind];
-          if (!tag) {
-            return <div key={kind}>No allocation for {kind}</div>;
+      <div className="flex gap-5 flex-wrap">
+        {toTrack.map((tagSpending) => {
+          if (!tagSpending) {
+            return <div key={tagSpending}>No allocation for {tagSpending}</div>;
           }
-          const allocation = parseInt(tag?.allocation?.allocation ?? "0", 10);
+          const allocation = parseInt(tagSpending?.allocation ?? "0", 10);
           const targetSpending = (allocation / 100) * estIncome;
-          const currentSpending = parseInt(
-            currentPeriodSpendingByTag[kind]?.amount ?? "0"
-          );
           return (
-            <div
-              className="flex-col gap-3 bg-white max-w-[500px] w-full"
-              key={kind}
-            >
-              <div className="flex gap-2 justify-between">
-                <div>{labelForKind[kind]}</div>
-
-                <form
-                  action={setTagAllocation}
-                  className="flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    name={tag.id}
-                    defaultValue={allocation}
-                    className="w-8"
-                  />
-                  <span>%</span>
-                  <button
-                    type="submit"
-                    className="shadow-sm  rounded px-2 py-1"
-                  >
-                    update
-                  </button>
-                </form>
+            <div className="flex-col gap-3  w-full" key={tagSpending.tagId}>
+              <div className="flex gap-2 justify-between text-xs">
+                <div>{tagSpending.label}</div>
+                <div>
+                  ${tagSpending.amount} / ${Math.round(targetSpending)}
+                </div>
               </div>
               <div className="flex flex-col gap-2">
-                <div className="text-xs">
-                  ${currentSpending} / ${Math.round(targetSpending)}
-                </div>
                 <div className="w-full h-6 overflow-hidden border rounded">
                   <div
                     className={`bg-blue-500 relative h-full`}
                     style={{
-                      width: `${(currentSpending / targetSpending) * 100}%`,
-                      background: tag.color,
+                      width: `${
+                        (Number(tagSpending.amount) / targetSpending) * 100
+                      }%`,
+                      background: tagSpending.color,
                     }}
                   ></div>
                 </div>
-                <div className="flex gap-3">
-                  <span className="text-xl">
-                    {isNaN(currentSpending) ? (
+                <div className="flex gap-3 text-sm">
+                  At x percent of income, you have
+                  <span className="font-bold">
+                    {isNaN(Number(tagSpending.amount)) ? (
                       <span className="text-right">
                         ${targetSpending.toFixed(2)}
                       </span>
                     ) : (
                       <span className="text-right">
-                        ${Math.round(targetSpending - currentSpending)}
+                        $
+                        {Math.round(
+                          targetSpending - Number(tagSpending.amount)
+                        )}
                       </span>
                     )}
                   </span>
-                  <span className="text-gray-500 text-sm">to spend</span>
+                  left to spend
                 </div>
               </div>
             </div>
           );
         })}
-        <div>TODO: create new target for tag</div>
+        <CreateAllocationForm tags={allUserTags} />
       </div>
+    </div>
+  );
+}
+
+function FeatureBox({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`p-3 shadow-md rounded bg-gray-100 ${className}`}>
+      {children}
     </div>
   );
 }
