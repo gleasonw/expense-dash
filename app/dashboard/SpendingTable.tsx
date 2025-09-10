@@ -33,12 +33,12 @@ const utcFormatter = new Intl.DateTimeFormat("en-US", {
   day: "2-digit",
 });
 
-function TransactionDateEditor({
+export function TransactionDateEditor({
   date,
   transaction,
 }: {
   date?: Date;
-  transaction: { id: string };
+  transaction: { transaction_id: string };
 }) {
   return (
     <Popover>
@@ -57,7 +57,11 @@ function TransactionDateEditor({
           mode="single"
           selected={date}
           onSelect={(date) =>
-            date && updateTransactionDate(transaction.id, date?.toISOString())
+            date &&
+            updateTransactionDate(
+              transaction.transaction_id,
+              date?.toISOString()
+            )
           }
         />
       </PopoverContent>
@@ -80,7 +84,7 @@ function rendererForColumn(
       return (
         <TransactionDateEditor
           date={transaction.date ? new Date(transaction.date) : undefined}
-          transaction={{ id: transaction.transaction_id }}
+          transaction={{ transaction_id: transaction.transaction_id }}
         />
       );
 
