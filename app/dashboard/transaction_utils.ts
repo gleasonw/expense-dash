@@ -12,19 +12,6 @@ export function toAppTransaction(
   })) as AppTransaction[];
 }
 
-export const formatCurrency = (value: number | string) => {
-  const roundedValue =
-    typeof value === "number"
-      ? Math.round(value * 100) / 100
-      : Math.round(parseFloat(value) * 100) / 100;
-  // Handle potential NaN if parsing fails
-  if (isNaN(roundedValue)) {
-    return "$--"; // Or some other placeholder
-  }
-  // Basic formatting, consider Intl.NumberFormat for more robust formatting
-  return `${roundedValue < 0 ? "-" : ""}$${Math.abs(roundedValue)}`;
-};
-
 export function idForTagTransaction({
   transactionId,
   tagId,

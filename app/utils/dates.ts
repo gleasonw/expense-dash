@@ -6,6 +6,9 @@ function isYyyyMm(s: string): s is YyyyMm {
 }
 
 export function normYyyyMm(s?: string): YyyyMm {
+  if (s && !isYyyyMm(s)) {
+    throw new Error(`invalid yyyy-mm: ${s}`);
+  }
   const d =
     s && isYyyyMm(s)
       ? new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, 1))
