@@ -27,17 +27,19 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 flex overflow-hidden max-h-screen flex-col antialiased`}
       >
-        <Link href="/dashboard">
-          <button className="p-2 border hover:bg-gray-200">Dashboard</button>
-        </Link>
-        <Link href="/dashboard/savings">
-          <button className="p-2 border hover:bg-gray-200">Savings</button>
-        </Link>
-        <Link href="/dashboard/tags">
-          <button className="p-2 border hover:bg-gray-200">Tags</button>
-        </Link>
+        <div>
+          <Link href="/dashboard">
+            <button className="p-2 border hover:bg-gray-200">Dashboard</button>
+          </Link>
+          <Link href="/dashboard/savings">
+            <button className="p-2 border hover:bg-gray-200">Savings</button>
+          </Link>
+          <Link href="/dashboard/tags">
+            <button className="p-2 border hover:bg-gray-200">Tags</button>
+          </Link>
+        </div>
         <ReactQueryProvider>{children}</ReactQueryProvider>
       </body>
     </html>
