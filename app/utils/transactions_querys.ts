@@ -10,6 +10,7 @@ export function getFilterConditions(
   const filterConditions = [];
   if (filters?.monthUTC) {
     const { start, end } = dateUtils.monthRangeUTC(filters.monthUTC);
+    console.log("filtering for month", filters.monthUTC, start, end);
     filterConditions.push(gte(transactions.date, start.toISOString()));
     filterConditions.push(lt(transactions.date, end.toISOString()));
   }

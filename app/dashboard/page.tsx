@@ -14,7 +14,6 @@ import { and, eq, gte, lt, notInArray, sql } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
-import { Label } from "@/app/components/Label";
 import Link from "next/link";
 import {
   autoTagTransactions,
@@ -22,10 +21,7 @@ import {
   tagAllAsFirstTag,
   tryAutoTagTransactions,
 } from "@/app/dashboard/transactions_sdk";
-import {
-  formatCurrency,
-  toAppTransaction,
-} from "@/app/dashboard/transaction_utils";
+import { toAppTransaction } from "@/app/dashboard/transaction_utils";
 import {
   getNetSpendingByMonth,
   spendingForMonth,
@@ -101,7 +97,7 @@ export default async function Dashboard({
   const netSpendForSelectedMonth = netSpendForMonth?.at(0);
 
   return (
-    <div className="flex flex-col sm:grid grid-cols-2 grid-rows-[auto_1fr] gap-5 max-h-full h-full overflow-hidden">
+    <div className="px-2 flex flex-col sm:grid grid-cols-2 grid-rows-[auto_1fr] gap-5 max-h-full h-full overflow-hidden max-w-[1400px] mx-auto">
       <div className="flex gap-2 w-full col-span-2">
         <MonthPicker monthUTC={monthUTC} />
         <div className="flex p-1 gap-5">
@@ -130,7 +126,7 @@ export default async function Dashboard({
       </div>
 
       <div className="flex flex-col max-h-full overflow-hidden gap-5">
-        <FeatureBox className="max-h-[400px] h-60 overflow-auto ">
+        <FeatureBox className="min-h-24 overflow-auto ">
           <SpendingCategorizer
             transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
           />
@@ -149,11 +145,9 @@ export default async function Dashboard({
               className="p-3 border-b hover:bg-gray-100 flex flex-col"
             >
               <div className="flex justify-between">
-                <span className="font-semibold">{t.name}</span>
+                <span>{t.name}</span>
                 <div className="flex flex-col items-end">
-                  <span className="text-gray-600">
-                    {formatCurrency(t.amount)}
-                  </span>
+                  <span>${Number(t.amount).toFixed(2)}</span>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -175,14 +169,14 @@ export default async function Dashboard({
       </div>
       <div className="flex flex-col gap-5">
         <FeatureBox className="col-start-2 row-start-2 row-span-2">
-          <SpendingTargets />
+          <SpendingTargets monthUTC={monthUTC} />
         </FeatureBox>
-        <div className="hidden sm:flex">
+        <FeatureBox className="hidden sm:flex">
           {/**@ts-expect-error css modules are a pain with ts */}
           <div className={style.chart}>
             <SpendingChart discretionaryByMonth={spending ?? []} />
           </div>
-        </div>
+        </FeatureBox>
       </div>
     </div>
   );
@@ -210,13 +204,13 @@ async function TransactionFilters() {
   );
 }
 
-async function SpendingTargets({ monthUTC }: { monthUTC?: string }) {
+async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }
   const monthFilters = getFilterConditions({
-    monthUTC: dateUtils.normYyyyMm(monthUTC),
+    monthUTC,
   });
   if (monthFilters.length === 0) {
     monthFilters.push(
@@ -315,7 +309,8 @@ async function SpendingTargets({ monthUTC }: { monthUTC?: string }) {
                   ></div>
                 </div>
                 <div className="flex gap-3 text-sm">
-                  At x percent of income, you have
+                  At <span>{isNaN(allocation) ? 0 : allocation}%</span> percent
+                  of income, you have
                   <span className="font-bold">
                     {isNaN(Number(tagSpending.amount)) ? (
                       <span className="text-right">
@@ -350,7 +345,7 @@ function FeatureBox({
   className?: string;
 }) {
   return (
-    <div className={`p-3 shadow-md rounded bg-gray-100 ${className}`}>
+    <div className={`p-3 shadow-md rounded bg-white ${className}`}>
       {children}
     </div>
   );

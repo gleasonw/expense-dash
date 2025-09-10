@@ -27,7 +27,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} flex overflow-hidden max-h-screen flex-col antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 flex overflow-hidden max-h-screen flex-col antialiased`}
       >
         <div>
           <Link href="/dashboard">
