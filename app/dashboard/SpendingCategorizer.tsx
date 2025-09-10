@@ -55,7 +55,7 @@ export function SpendingCategorizer({
   // add addTag, removeTag, then figure out how to batch upsert on form submit
   return (
     <form
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-4 p-2"
       action={() => {
         setPendingTransactionTags({});
         startTransition(() => {
@@ -63,9 +63,9 @@ export function SpendingCategorizer({
         });
       }}
     >
-      <div className="flex flex-wrap gap-10">
+      <div className="flex flex-wrap gap-5">
         {transactionsWithoutTag.map((transaction) => (
-          <div key={transaction.transaction_id} className="p-5 flex flex-col">
+          <div key={transaction.transaction_id} className="flex flex-col">
             <span>{transaction.amount}</span>
             <span>{transaction.name}</span>
             <TransactionCategorizer
