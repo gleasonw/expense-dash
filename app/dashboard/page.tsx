@@ -97,7 +97,7 @@ export default async function Dashboard({
   const netSpendForSelectedMonth = netSpendForMonth?.at(0);
 
   return (
-    <div className="px-2 flex flex-col sm:grid grid-cols-2 grid-rows-[auto_1fr] gap-5 max-h-full h-full overflow-hidden max-w-[1400px] mx-auto">
+    <div className="px-2 flex flex-col sm:grid grid-cols-2 grid-rows-[auto_1fr] gap-5 max-h-full overflow-hidden max-w-[1400px] mx-auto">
       <div className="flex gap-2 w-full col-span-2">
         <MonthPicker monthUTC={monthUTC} />
         <div className="flex p-1 gap-5">
@@ -125,8 +125,8 @@ export default async function Dashboard({
         </div>
       </div>
 
-      <div className="flex flex-col max-h-full overflow-hidden gap-5">
-        <FeatureBox className="min-h-24 overflow-auto ">
+      <div className="flex flex-col gap-5">
+        <FeatureBox className="min-h-24 overflow-auto max-h-[250px] ">
           <SpendingCategorizer
             transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
           />
@@ -137,7 +137,18 @@ export default async function Dashboard({
             <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
           )}
         </FeatureBox>
-        <FeatureBox className="overflow-auto max-h-[400px] sm:max-h-full flex flex-col">
+        <FeatureBox className="col-start-2 row-start-2 row-span-2">
+          <SpendingTargets monthUTC={monthUTC} />
+        </FeatureBox>
+        <FeatureBox className="hidden sm:flex">
+          {/**@ts-expect-error css modules are a pain with ts */}
+          <div className={style.chart}>
+            <SpendingChart discretionaryByMonth={spending ?? []} />
+          </div>
+        </FeatureBox>
+      </div>
+      <div className="flex flex-col max-h-full overflow-hidden gap-5">
+        <FeatureBox className="overflow-auto sm:max-h-full flex flex-col">
           <TransactionFilters />
           {tsMerged.map((t) => (
             <div
@@ -165,17 +176,6 @@ export default async function Dashboard({
               </div>
             </div>
           ))}
-        </FeatureBox>
-      </div>
-      <div className="flex flex-col gap-5">
-        <FeatureBox className="col-start-2 row-start-2 row-span-2">
-          <SpendingTargets monthUTC={monthUTC} />
-        </FeatureBox>
-        <FeatureBox className="hidden sm:flex">
-          {/**@ts-expect-error css modules are a pain with ts */}
-          <div className={style.chart}>
-            <SpendingChart discretionaryByMonth={spending ?? []} />
-          </div>
         </FeatureBox>
       </div>
     </div>
