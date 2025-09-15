@@ -295,7 +295,7 @@ export const bucketMovements = pgTable(
       .references(() => userTable.id),
     bucketId: integer("bucket_id")
       .notNull()
-      .references(() => buckets.id),
+      .references(() => buckets.id, { onDelete: "cascade" }),
     amount: decimal("amount", { precision: 20, scale: 2 }).notNull(), // +/-
     note: text("note"),
     transactionId: text("transaction_id"), // optional link to a real transaction
