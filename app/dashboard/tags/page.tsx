@@ -16,7 +16,7 @@ export default async function TagsPage() {
     .where(eq(tags_new.userId, user.user.id))
     .orderBy(asc(tags_new.label));
   return (
-    <div className="flex flex-col gap-5 p-5">
+    <div className="flex flex-col gap-5 p-5 max-w-5xl mx-auto">
       <TagMaker />
       <div className="flex flex-wrap gap-5">
         {userTags.map((tag) => (
