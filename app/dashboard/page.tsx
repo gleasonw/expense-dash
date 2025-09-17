@@ -34,6 +34,7 @@ import { TransactionDateEditor } from "@/app/dashboard/SpendingTable";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
+import clsx from "clsx";
 
 // TODO
 // fix bugs in allocations zone
@@ -124,19 +125,23 @@ export default async function Dashboard({
           </div>
         </div>
       </div>
+      <FeatureBox
+        className={clsx(" col-span-2 ", {
+          hidden: tsMerged.filter((t) => t.tags.length === 0).length === 0,
+        })}
+      >
+        <SpendingCategorizer
+          transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
+        />
+        <button className="border" onClick={tryAutoTagTransactions}>
+          Autotag transactions
+        </button>
+        {IS_LOCAL_HOST && (
+          <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
+        )}
+      </FeatureBox>
 
       <div className="flex flex-col gap-5">
-        <FeatureBox className="min-h-24 overflow-auto max-h-[250px] ">
-          <SpendingCategorizer
-            transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
-          />
-          <button className="border" onClick={tryAutoTagTransactions}>
-            Autotag transactions
-          </button>
-          {IS_LOCAL_HOST && (
-            <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
-          )}
-        </FeatureBox>
         <FeatureBox className="col-start-2 row-start-2 row-span-2">
           <SpendingTargets monthUTC={monthUTC} />
         </FeatureBox>
@@ -148,7 +153,7 @@ export default async function Dashboard({
         </FeatureBox>
       </div>
       <div className="flex flex-col max-h-full overflow-hidden gap-5">
-        <FeatureBox className="overflow-auto sm:max-h-full flex flex-col">
+        <FeatureBox className="overflow-auto  sm:max-h-screen flex flex-col">
           <TransactionFilters />
           {tsMerged.map((t) => (
             <div

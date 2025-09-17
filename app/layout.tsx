@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ReactQueryProvider } from "@/app/ReactQueryProvider";
 import Link from "next/link";
+import { Home, PiggyBank, Tag } from "lucide-react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,17 +28,26 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 flex overflow-hidden max-h-screen flex-col antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 flex flex-col antialiased relative`}
       >
-        <div>
+        <div className="absolute flex flex-col">
           <Link href="/dashboard">
-            <button className="p-2 border hover:bg-gray-200">Dashboard</button>
+            <button className="p-2 border hover:bg-gray-200" aria-label="Home">
+              <Home />
+            </button>
           </Link>
           <Link href="/dashboard/savings">
-            <button className="p-2 border hover:bg-gray-200">Savings</button>
+            <button
+              className="p-2 border hover:bg-gray-200"
+              aria-label="Savings"
+            >
+              <PiggyBank />
+            </button>
           </Link>
           <Link href="/dashboard/tags">
-            <button className="p-2 border hover:bg-gray-200">Tags</button>
+            <button className="p-2 border hover:bg-gray-200" aria-label="Tags">
+              <Tag />
+            </button>
           </Link>
         </div>
         <ReactQueryProvider>{children}</ReactQueryProvider>

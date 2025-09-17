@@ -45,7 +45,7 @@ export default async function Savings() {
   const savingsTarget = await getMonthTargetForTag("savings");
   console.log({ savingsTarget });
   return (
-    <div className="p-3 flex flex-col gap-5">
+    <div className="p-3 flex flex-col gap-5 max-w-5xl mx-auto">
       <BucketForm />
       <div className="shadow-md p-5 border">
         <h1>
