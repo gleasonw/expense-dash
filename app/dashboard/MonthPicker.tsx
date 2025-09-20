@@ -22,6 +22,7 @@ export function MonthPicker({
     <Calendar
       mode="single"
       month={end}
+      className="bg-transparent"
       onMonthChange={(month) => {
         router.push(`/dashboard?monthUTC=${month.toISOString().slice(0, 7)}`);
       }}

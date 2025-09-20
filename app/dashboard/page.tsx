@@ -35,6 +35,7 @@ import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
+import { Label } from "@/app/components/Label";
 
 // TODO
 // fix bugs in allocations zone
@@ -99,19 +100,22 @@ export default async function Dashboard({
 
   return (
     <div className="px-2 flex flex-col sm:grid grid-cols-2 grid-rows-[auto_1fr] gap-5 max-h-full overflow-hidden max-w-[1400px] mx-auto">
-      <div className="flex gap-2 w-full col-span-2">
+      <div className="flex gap-2 w-full col-span-2 flex-wrap ml-10">
         <MonthPicker monthUTC={monthUTC} />
         <div className="flex p-1 gap-5">
-          <div className="flex flex-col text-right">
-            <span>${netSpendForSelectedMonth?.total_income}</span>
-            <span>${netSpendForSelectedMonth?.total_spending}</span>
-          </div>
-          <div
+          <Label text={"Income"}>
+            ${netSpendForSelectedMonth?.total_income}
+          </Label>
+          <Label text={"Spending"}>
+            ${netSpendForSelectedMonth?.total_spending}
+          </Label>
+          <Label
             className={`flex flex-col text-lg ${
               Number(netSpendForSelectedMonth?.net_amount) < 0
                 ? "text-red-700"
                 : "text-green-700"
             }`}
+            text={"Net"}
           >
             <span
               className={`p-3 ${
@@ -122,7 +126,7 @@ export default async function Dashboard({
             >
               ${netSpendForSelectedMonth?.net_amount}
             </span>
-          </div>
+          </Label>
         </div>
       </div>
       <FeatureBox

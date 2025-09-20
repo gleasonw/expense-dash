@@ -59,6 +59,7 @@ export async function tagAllAsFirstTag() {
       tag_id: tag.id,
     }));
     await db.insert(tagsLinkNew).values(tagLinksToUpsert).onConflictDoNothing();
+    revalidatePath("/dashboard");
   } catch (e) {
     throw e;
   }
