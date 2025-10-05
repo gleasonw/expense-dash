@@ -24,7 +24,12 @@ export function MonthPicker({
       month={end}
       className="bg-transparent"
       onMonthChange={(month) => {
-        router.push(`/dashboard?monthUTC=${month.toISOString().slice(0, 7)}`);
+        const currentURL = new URL(window.location.href);
+        currentURL.searchParams.set(
+          "monthUTC",
+          month.toISOString().slice(0, 7)
+        );
+        router.push(currentURL.toString());
       }}
       captionLayout="dropdown" // shows month/year dropdown
       startMonth={new Date(2000, 0)}

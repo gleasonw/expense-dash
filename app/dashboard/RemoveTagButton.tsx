@@ -13,7 +13,7 @@ export function RemoveTagButton({
 }) {
   return (
     <button
-      className="bg-blue-200 text-blue-800 px-2 py-1 rounded-md"
+      className="bg-blue-200 text-blue-800  px-1 py-0 rounded-md"
       onClick={() =>
         removeTagFromTransaction({
           transactionId: transaction.transaction_id,
