@@ -14,7 +14,6 @@ import { and, eq, gte, lt, notInArray, sql } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
 import * as R from "remeda";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import {
   autoTagTransactions,
   getTransactionsWithTags,
@@ -36,6 +35,7 @@ import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
 import { Label } from "@/app/components/Label";
+import { QueryParamFilterLink } from "@/app/dashboard/QueryParamFilterLink";
 
 // TODO
 // fix bugs in allocations zone
@@ -202,13 +202,13 @@ async function TransactionFilters() {
   return (
     <div className="flex flex-wrap gap-2">
       {userTags.map((t) => (
-        <Link href={`?tag=${t.tag}`} key={t.tag}>
-          <div className="p-2 border hover:bg-gray-200">{t.tag}</div>
-        </Link>
+        <QueryParamFilterLink value={t.tag} label="tag" key={t.tag}>
+          {t.tag}
+        </QueryParamFilterLink>
       ))}
-      <Link href={`/dashboard`}>
-        <div className="p-2 border hover:bg-gray-200">All</div>
-      </Link>
+      <QueryParamFilterLink value="" label="tag">
+        All
+      </QueryParamFilterLink>
     </div>
   );
 }
