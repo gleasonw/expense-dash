@@ -36,10 +36,11 @@ import { RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
 import { Label } from "@/app/components/Label";
 import { QueryParamFilterLink } from "@/app/dashboard/QueryParamFilterLink";
+import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
+import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
+import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
 
 // TODO
-// fix bugs in allocations zone
-// make the KPI zone more explicit: estimated income, total spending, net
 // break down transactions table into accounts (tabs probably make the most sense here)
 // migrate savings page away from old spending query
 
@@ -290,58 +291,69 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
 
   return (
     <div className="flex flex-col gap-5 w-full">
-      <div className="flex gap-5 flex-wrap">
-        {toTrack.map((tagSpending) => {
-          if (!tagSpending) {
-            return <div key={tagSpending}>No allocation for {tagSpending}</div>;
-          }
-          const allocation = parseInt(tagSpending?.allocation ?? "0", 10);
-          const targetSpending = (allocation / 100) * estIncome;
-          return (
-            <div className="flex-col gap-3  w-full" key={tagSpending.tagId}>
-              <div className="flex gap-2 justify-between text-xs">
-                <div>{tagSpending.label}</div>
-                <div>
-                  ${tagSpending.amount} / ${Math.round(targetSpending)}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="w-full h-6 overflow-hidden border rounded">
-                  <div
-                    className={`bg-blue-500 relative h-full`}
-                    style={{
-                      width: `${
-                        (Number(tagSpending.amount) / targetSpending) * 100
-                      }%`,
-                      background: tagSpending.color,
-                    }}
-                  ></div>
-                </div>
-                <div className="flex gap-3 text-sm">
-                  At <span>{isNaN(allocation) ? 0 : allocation}%</span> percent
-                  of income, you have
-                  <span className="font-bold">
-                    {isNaN(Number(tagSpending.amount)) ? (
-                      <span className="text-right">
-                        ${targetSpending.toFixed(2)}
-                      </span>
-                    ) : (
-                      <span className="text-right">
-                        $
-                        {Math.round(
-                          targetSpending - Number(tagSpending.amount)
+      <AllocationEditContext>
+        <div className="flex gap-5 flex-wrap">
+          {toTrack.map((tagSpending) => {
+            if (!tagSpending) {
+              return (
+                <div key={tagSpending}>No allocation for {tagSpending}</div>
+              );
+            }
+            const allocation = parseInt(tagSpending?.allocation ?? "0", 10);
+            const targetSpending = (allocation / 100) * estIncome;
+            return (
+              <div key={tagSpending.tagId} className="w-full flex">
+                <div className="flex-col gap-3 w-full">
+                  <div className="flex gap-2 justify-between text-xs">
+                    <div>{tagSpending.label}</div>
+                    <div>
+                      ${tagSpending.amount} / ${Math.round(targetSpending)}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="w-full h-6 overflow-hidden border rounded">
+                      <div
+                        className={`bg-blue-500 relative h-full`}
+                        style={{
+                          width: `${
+                            (Number(tagSpending.amount) / targetSpending) * 100
+                          }%`,
+                          background: tagSpending.color,
+                        }}
+                      ></div>
+                    </div>
+                    <div className="flex gap-3 text-sm">
+                      At <span>{isNaN(allocation) ? 0 : allocation}%</span>{" "}
+                      percent of income, you have
+                      <span className="font-bold">
+                        {isNaN(Number(tagSpending.amount)) ? (
+                          <span className="text-right">
+                            ${targetSpending.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-right">
+                            $
+                            {Math.round(
+                              targetSpending - Number(tagSpending.amount)
+                            )}
+                          </span>
                         )}
                       </span>
-                    )}
-                  </span>
-                  left to spend
+                      left to spend
+                    </div>
+                  </div>
                 </div>
+                <AllocationDeleteButton tagId={tagSpending.tagId} />
               </div>
-            </div>
-          );
-        })}
-        <CreateAllocationForm tags={allUserTags} />
-      </div>
+            );
+          })}
+          <CreateAllocationForm tags={allUserTags} />
+
+          <div className="ml-auto">
+            <AllocationEditButton />
+          </div>
+        </div>
+      </AllocationEditContext>
     </div>
   );
 }
