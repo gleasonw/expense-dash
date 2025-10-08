@@ -8,7 +8,7 @@ import {
   UpdateTag,
 } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function updateTag(tag: UpdateTag) {
@@ -45,4 +45,21 @@ export async function createAllocationForTag(
     .returning();
   revalidatePath(`/dashboard`);
   return result;
+}
+
+export async function deleteAllocationForTag(tagId: string) {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return;
+  }
+  await db
+    .delete(tagAllocationsNew)
+    .where(
+      and(
+        eq(tagAllocationsNew.tag_id, tagId),
+        eq(tagAllocationsNew.user_id, user.user.id)
+      )
+    );
+  revalidatePath(`/dashboard`);
+  return;
 }

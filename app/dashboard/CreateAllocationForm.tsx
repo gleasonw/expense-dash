@@ -1,6 +1,7 @@
 "use client";
 
 import { createAllocationForTag } from "@/app/dashboard/tag_actions";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export function CreateAllocationForm({
@@ -20,23 +21,25 @@ export function CreateAllocationForm({
 
   if (!show) {
     return (
-      <button
+      <Button
+        variant="default"
         onClick={() => setShow(true)}
         className="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 max-w-sm"
       >
         +
-      </button>
+      </Button>
     );
   }
 
   return (
-    <div>
-      <button
+    <div className="border">
+      <Button
+        variant="ghost"
         onClick={() => setShow(false)}
         className="mb-4 text-gray-500 hover:underline"
       >
         Cancel
-      </button>
+      </Button>
       <form
         onSubmit={handleSubmit}
         className="flex flex-col gap-4 p-4 max-w-sm"
@@ -70,12 +73,12 @@ export function CreateAllocationForm({
           />
         </label>
 
-        <button
+        <Button
           type="submit"
           className="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700"
         >
           Create Allocation
-        </button>
+        </Button>
       </form>
     </div>
   );
