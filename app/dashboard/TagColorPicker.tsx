@@ -52,7 +52,7 @@ export function TagColorPicker({ tag }: { tag: Tag }) {
                 )
               );
             }}
-            className="max-w-sm h-[300px] rounded-md border bg-background p-4 shadow-sm"
+            className="max-w-sm h-[300px] rounded-md border bg-background p-4 shadow-xs"
           >
             <ColorPickerSelection />
             <div className="flex items-center gap-4">
