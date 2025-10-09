@@ -200,7 +200,7 @@ export function TransactionCategorizer({
             <button
               key={t.id}
               className={`bg-gray-200 text-gray-800 px-2 py-1 rounded-md hover:cursor-pointer ${
-                tagIsSelectedForTransaction ? "bg-green-500 outline" : ""
+                tagIsSelectedForTransaction ? "bg-green-500 outline-solid" : ""
               }`}
               onClick={(e) => {
                 e.preventDefault();

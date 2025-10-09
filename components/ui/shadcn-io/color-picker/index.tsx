@@ -232,7 +232,7 @@ export const ColorPickerHue = ({
       <Slider.Track className="relative my-0.5 h-3 w-full grow rounded-full bg-[linear-gradient(90deg,#FF0000,#FFFF00,#00FF00,#00FFFF,#0000FF,#FF00FF,#FF0000)]">
         <Slider.Range className="absolute h-full" />
       </Slider.Track>
-      <Slider.Thumb className="block h-4 w-4 rounded-full border border-primary/50 bg-background shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
+      <Slider.Thumb className="block h-4 w-4 rounded-full border border-primary/50 bg-background shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
     </Slider.Root>
   );
 };
@@ -261,10 +261,10 @@ export const ColorPickerAlpha = ({
             'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==") left center',
         }}
       >
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent to-black/50" />
+        <div className="absolute inset-0 rounded-full bg-linear-to-r from-transparent to-black/50" />
         <Slider.Range className="absolute h-full rounded-full bg-transparent" />
       </Slider.Track>
-      <Slider.Thumb className="block h-4 w-4 rounded-full border border-primary/50 bg-background shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
+      <Slider.Thumb className="block h-4 w-4 rounded-full border border-primary/50 bg-background shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
     </Slider.Root>
   );
 };
@@ -341,7 +341,7 @@ const PercentageInput = ({ className, ...props }: PercentageInputProps) => {
         type="text"
         {...props}
         className={cn(
-          "h-8 w-[3.25rem] rounded-l-none bg-secondary px-2 text-xs shadow-none",
+          "h-8 w-13 rounded-l-none bg-secondary px-2 text-xs shadow-none",
           className
         )}
       />
@@ -367,7 +367,7 @@ export const ColorPickerFormat = ({
     return (
       <div
         className={cn(
-          "-space-x-px relative flex w-full items-center rounded-md shadow-sm",
+          "-space-x-px relative flex w-full items-center rounded-md shadow-xs",
           className
         )}
         {...props}
@@ -392,7 +392,7 @@ export const ColorPickerFormat = ({
     return (
       <div
         className={cn(
-          "-space-x-px flex items-center rounded-md shadow-sm",
+          "-space-x-px flex items-center rounded-md shadow-xs",
           className
         )}
         {...props}
@@ -422,7 +422,7 @@ export const ColorPickerFormat = ({
       .map((value) => Math.round(value));
 
     return (
-      <div className={cn("w-full rounded-md shadow-sm", className)} {...props}>
+      <div className={cn("w-full rounded-md shadow-xs", className)} {...props}>
         <Input
           className="h-8 w-full bg-secondary px-2 text-xs shadow-none"
           readOnly
@@ -443,7 +443,7 @@ export const ColorPickerFormat = ({
     return (
       <div
         className={cn(
-          "-space-x-px flex items-center rounded-md shadow-sm",
+          "-space-x-px flex items-center rounded-md shadow-xs",
           className
         )}
         {...props}

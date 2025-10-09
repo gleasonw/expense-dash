@@ -38,7 +38,7 @@ async function TagMaker() {
       <input
         name="tag"
         type="text"
-        className="border rounded-md shadow-sm"
+        className="border rounded-md shadow-xs"
         placeholder="tag"
       />
 
