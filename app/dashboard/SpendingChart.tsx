@@ -3,6 +3,7 @@
 import * as Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
 import { useMemo } from "react";
+import "./highcharts.css";
 
 type SpendingChartProps = {
   discretionaryByMonth: Array<{
@@ -31,6 +32,7 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
 
     return {
       chart: {
+        styledMode: true,
         type: "column",
         width: null,
         height: null,
@@ -73,7 +75,8 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
       series: Object.entries(groupedData).map(([tag, { data, color }]) => ({
         name: tag,
         data,
-        color,
+        color: "",
+        className: `fill-${color}-500`,
       })),
     };
   }, [discretionaryByMonth]);

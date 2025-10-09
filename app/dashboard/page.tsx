@@ -313,12 +313,11 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
                   <div className="flex flex-col gap-2">
                     <div className="w-full h-6 overflow-hidden border rounded">
                       <div
-                        className={`bg-blue-500 relative h-full`}
+                        className={`relative h-full bg-${tagSpending.color}-500`}
                         style={{
                           width: `${
                             (Number(tagSpending.amount) / targetSpending) * 100
                           }%`,
-                          background: tagSpending.color,
                         }}
                       ></div>
                     </div>
