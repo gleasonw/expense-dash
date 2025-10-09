@@ -1,4 +1,72 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+@source inline("{hover:,}bg-red-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-orange-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-amber-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-yellow-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-lime-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-green-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-emerald-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-teal-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-cyan-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-sky-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-blue-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-indigo-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-violet-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-purple-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-fuchsia-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-pink-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-rose-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-slate-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-gray-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-zinc-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-neutral-{50,{100..900..100},950}");
+@source inline("{hover:,}bg-stone-{50,{100..900..100},950}");
+
+@source inline("{hover:,}fill-red-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-orange-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-amber-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-yellow-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-lime-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-green-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-emerald-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-teal-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-cyan-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-sky-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-blue-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-indigo-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-violet-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-purple-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-fuchsia-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-pink-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-rose-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-slate-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-gray-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-zinc-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-neutral-{50,{100..900..100},950}");
+@source inline("{hover:,}fill-stone-{50,{100..900..100},950}");
+
+@source inline("{hover:,}color-red-{50,{100..900..100},950}");
+@source inline("{hover:,}color-orange-{50,{100..900..100},950}");
+@source inline("{hover:,}color-amber-{50,{100..900..100},950}");
+@source inline("{hover:,}color-yellow-{50,{100..900..100},950}");
+@source inline("{hover:,}color-lime-{50,{100..900..100},950}");
+@source inline("{hover:,}color-green-{50,{100..900..100},950}");
+@source inline("{hover:,}color-emerald-{50,{100..900..100},950}");
+@source inline("{hover:,}color-teal-{50,{100..900..100},950}");
+@source inline("{hover:,}color-cyan-{50,{100..900..100},950}");
+@source inline("{hover:,}color-sky-{50,{100..900..100},950}");
+@source inline("{hover:,}color-blue-{50,{100..900..100},950}");
+@source inline("{hover:,}color-indigo-{50,{100..900..100},950}");
+@source inline("{hover:,}color-violet-{50,{100..900..100},950}");
+@source inline("{hover:,}color-purple-{50,{100..900..100},950}");
+@source inline("{hover:,}color-fuchsia-{50,{100..900..100},950}");
+@source inline("{hover:,}color-pink-{50,{100..900..100},950}");
+@source inline("{hover:,}color-rose-{50,{100..900..100},950}");
+@source inline("{hover:,}color-slate-{50,{100..900..100},950}");
+@source inline("{hover:,}color-gray-{50,{100..900..100},950}");
+@source inline("{hover:,}color-zinc-{50,{100..900..100},950}");
+@source inline("{hover:,}color-neutral-{50,{100..900..100},950}");
+@source inline("{hover:,}color-stone-{50,{100..900..100},950}");
 
 @plugin 'tailwindcss-animate';
 
@@ -64,7 +132,6 @@
 
 @layer base {
   :root {
-
     --background: 0 0% 100%;
 
     --foreground: 0 0% 3.9%;
@@ -113,10 +180,9 @@
 
     --chart-5: 27 87% 67%;
 
-    --radius: 0.5rem
+    --radius: 0.5rem;
   }
   .dark {
-
     --background: 0 0% 3.9%;
 
     --foreground: 0 0% 98%;
@@ -163,11 +229,9 @@
 
     --chart-4: 280 65% 60%;
 
-    --chart-5: 340 75% 55%
+    --chart-5: 340 75% 55%;
   }
 }
-
-
 
 @layer base {
   * {
