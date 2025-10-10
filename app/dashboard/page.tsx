@@ -175,7 +175,8 @@ export default async function Dashboard({
               </div>
               <div className="flex flex-wrap gap-2">
                 {t.tags
-                  .toSorted((a, b) => a.tag.localeCompare(b.tag))
+                  .slice()
+                  .sort((a, b) => a.tag.localeCompare(b.tag))
                   .map((tag) => (
                     <RemoveTagButton key={tag.tag} transaction={t} tag={tag}>
                       {tag.tag}
