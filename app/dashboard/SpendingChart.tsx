@@ -76,7 +76,7 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
         name: tag,
         data,
         color: "",
-        className: `fill-${color}-500`,
+        className: `fill-${color}-400`,
       })),
     };
   }, [discretionaryByMonth]);
