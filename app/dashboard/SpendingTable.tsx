@@ -16,8 +16,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 
 const columns = [
@@ -43,14 +41,12 @@ export function TransactionDateEditor({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
+        <button
           data-empty={!date}
-          className="data-[empty=true]:text-muted-foreground w-[200px] justify-start text-left font-normal"
+          className="data-[empty=true]:text-muted-foreground w-[200px] justify-end gap-2 flex text-sm text-gray-400 font-normal "
         >
-          <CalendarIcon />
           {date ? utcFormatter.format(date) : <span>Pick a date</span>}
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">
         <Calendar

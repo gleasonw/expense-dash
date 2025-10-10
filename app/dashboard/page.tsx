@@ -32,13 +32,14 @@ import { MonthPicker } from "@/app/dashboard/MonthPicker";
 import { TransactionDateEditor } from "@/app/dashboard/SpendingTable";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
-import { RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
+import { AddTagInput, RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
 import { Label } from "@/app/components/Label";
 import { QueryParamFilterLink } from "@/app/dashboard/QueryParamFilterLink";
 import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
 import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
 import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
+import { allUserTags } from "@/app/dashboard/tags_sdk";
 
 // TODO
 // break down transactions table into accounts (tabs probably make the most sense here)
@@ -87,7 +88,7 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  const [tsMerged, spending, netSpendForMonth] = await Promise.all([
+  const [tsMerged, spending, netSpendForMonth, allTags] = await Promise.all([
     getTransactionsWithTags({ tag: filterByTag, monthUTC }),
     spendingForMonth({
       monthUTC,
@@ -95,6 +96,7 @@ export default async function Dashboard({
       excludeTags: ["income", "transfer"],
     }),
     getNetSpendingByMonth({ monthUTC }),
+    allUserTags(),
   ]);
 
   const netSpendForSelectedMonth = netSpendForMonth?.at(0);
@@ -163,20 +165,23 @@ export default async function Dashboard({
           {tsMerged.map((t) => (
             <div
               key={t.transaction_id}
-              className="p-3 border-b hover:bg-gray-100 flex flex-col"
+              className="p-3 border-b hover:bg-gray-100 flex gap-1 flex-col"
             >
               <div className="flex justify-between">
-                <span>{t.name}</span>
-                <div className="flex flex-col items-end">
+                <span className="text-sm">{t.name}</span>
+                <div className="flex flex-col items-end text-lg">
                   <span>${Number(t.amount).toFixed(2)}</span>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {t.tags.map((tag) => (
-                  <RemoveTagButton key={tag.tag} transaction={t} tag={tag}>
-                    {tag.tag}
-                  </RemoveTagButton>
-                ))}
+                {t.tags
+                  .toSorted((a, b) => a.tag.localeCompare(b.tag))
+                  .map((tag) => (
+                    <RemoveTagButton key={tag.tag} transaction={t} tag={tag}>
+                      {tag.tag}
+                    </RemoveTagButton>
+                  ))}
+                <AddTagInput tags={allTags} transaction={t} />
                 <div className="ml-auto">
                   <TransactionDateEditor
                     date={new Date(t.date)}
@@ -285,14 +290,11 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
   const toTrack = taggedSpendingByPeriod.filter((t) => t.allocation !== null);
 
-  const allUserTags = await db.query.tags_new.findMany({
-    where: eq(tags_new.userId, user.user.id),
-  });
-
+  const tags = await allUserTags();
   return (
     <div className="flex flex-col gap-5 w-full">
       <AllocationEditContext>
-        <div className="flex gap-5 flex-wrap">
+        <div className="flex gap-4 flex-wrap">
           {toTrack.map((tagSpending) => {
             if (!tagSpending) {
               return (
@@ -303,17 +305,17 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
             const targetSpending = (allocation / 100) * estIncome;
             return (
               <div key={tagSpending.tagId} className="w-full flex">
-                <div className="flex-col gap-3 w-full">
-                  <div className="flex gap-2 justify-between text-xs">
+                <div className="flex-col gap-2 w-full flex">
+                  <div className="flex gap-2 justify-between text-sm">
                     <div>{tagSpending.label}</div>
                     <div>
                       ${tagSpending.amount} / ${Math.round(targetSpending)}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <div className="w-full h-6 overflow-hidden border rounded">
+                    <div className="w-full h-3 overflow-hidden border rounded">
                       <div
-                        className={`relative h-full bg-${tagSpending.color}-500`}
+                        className={`relative h-full bg-${tagSpending.color}-400`}
                         style={{
                           width: `${
                             (Number(tagSpending.amount) / targetSpending) * 100
@@ -321,24 +323,27 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
                         }}
                       ></div>
                     </div>
-                    <div className="flex gap-3 text-sm">
-                      At <span>{isNaN(allocation) ? 0 : allocation}%</span>{" "}
-                      percent of income, you have
-                      <span className="font-bold">
-                        {isNaN(Number(tagSpending.amount)) ? (
-                          <span className="text-right">
-                            ${targetSpending.toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="text-right">
-                            $
-                            {Math.round(
-                              targetSpending - Number(tagSpending.amount)
-                            )}
-                          </span>
-                        )}
+                    <div className="flex w-full justify-between">
+                      <div className="text-sm text-gray-500">
+                        <span className="text-lg pr-2 text-black">
+                          {isNaN(Number(tagSpending.amount)) ? (
+                            <span className="text-right">
+                              ${targetSpending.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-right">
+                              $
+                              {Math.round(
+                                targetSpending - Number(tagSpending.amount)
+                              )}
+                            </span>
+                          )}
+                        </span>
+                        left to spend
+                      </div>
+                      <span className="text-sm align-bottom text-gray-500 px-2">
+                        {isNaN(allocation) ? 0 : allocation}%
                       </span>
-                      left to spend
                     </div>
                   </div>
                 </div>
@@ -346,7 +351,7 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
               </div>
             );
           })}
-          <CreateAllocationForm tags={allUserTags} />
+          <CreateAllocationForm tags={tags} />
 
           <div className="ml-auto">
             <AllocationEditButton />
