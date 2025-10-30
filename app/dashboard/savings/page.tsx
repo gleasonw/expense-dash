@@ -33,13 +33,15 @@ export default async function Savings() {
       </div>
     );
   }
-  const { rows } = await getSpendingByMonth({ afterXMonthsAgo: 1 });
+  const rows = await getSpendingByMonth({ afterXMonthsAgo: 1 });
   const buckets = await getBuckets();
 
   //TODO: hardcoded savings tag? should probably just be a default we add
   // when the user registers
-  const currentMonthSavings = rows.find(
-    (row) => row.is_current_month && row.tag === "savings"
+  const currentMonthSavings = rows?.find(
+    (row) =>
+      row.month === new Date().toISOString().slice(0, 7) &&
+      row.tag === "savings"
   );
 
   const savingsTarget = await getMonthTargetForTag("savings");

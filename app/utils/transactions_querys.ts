@@ -5,7 +5,13 @@ import { and, eq, gte, inArray, lt, notExists, sql } from "drizzle-orm";
 
 /** filters expected to apply directly onto the transactions table */
 export function getFilterConditions(
-  filters: { monthUTC?: dateUtils.YyyyMm; excludeTags?: string[] } | undefined
+  filters:
+    | {
+        monthUTC?: dateUtils.YyyyMm;
+        excludeTags?: string[];
+        afterXMonthsAgo?: number;
+      }
+    | undefined
 ) {
   const filterConditions = [];
   if (filters?.monthUTC) {
@@ -27,6 +33,16 @@ export function getFilterConditions(
               inArray(tags_new.tag, filters.excludeTags)
             )
           )
+      )
+    );
+  }
+  if (filters?.afterXMonthsAgo !== undefined) {
+    filterConditions.push(
+      gte(
+        transactions.date,
+        sql`DATE_TRUNC('month', CURRENT_DATE - ${
+          filters.afterXMonthsAgo ?? 0
+        } * INTERVAL '1 month')`
       )
     );
   }
