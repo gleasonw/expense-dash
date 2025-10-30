@@ -1,18 +1,10 @@
 import { YyyyMm } from "@/app/utils/dates";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { db } from "@/server/db";
-import { tags_new, tagsLinkNew, transactions, User } from "@/server/schema";
+import { tags_new, tagsLinkNew, transactions } from "@/server/schema";
 import { getUserWithToken } from "@/server/session";
 import { and, asc, eq, exists, inArray, notExists, sql } from "drizzle-orm";
 import { cache } from "react";
-
-type MonthAggregate = {
-  month: string;
-  amount: string;
-  tag: string;
-  tag_id: string;
-  is_current_month: boolean;
-};
 
 type SpendingByMonthArgs = {
   afterXMonthsAgo?: number;
@@ -32,8 +24,11 @@ export async function getMonthTargetForTag(tag: string) {
   console.log({ thisAndLastMonthSpending });
 
   //TODO: this is a bit klunky, need to figure out a more expressive API
-  const lastMonthIncome = thisAndLastMonthSpending.rows.reduce((acc, rows) => {
-    if (rows.tag !== "income" || rows.is_current_month) {
+  const lastMonthIncome = thisAndLastMonthSpending?.reduce((acc, rows) => {
+    if (
+      rows.tag !== "income" ||
+      rows.month === new Date().toISOString().slice(0, 7)
+    ) {
       return acc;
     }
     return acc + parseFloat(rows.amount);
@@ -66,18 +61,16 @@ export async function getMonthTargetForTag(tag: string) {
     fullTag,
     lastMonthIncome,
     tagAllocation,
-    target: lastMonthIncome * allocationPercent * -1,
+    target: (lastMonthIncome ?? 0) * allocationPercent * -1,
   };
 }
 
-export async function getSpendingByMonth(args?: SpendingByMonthArgs): Promise<{
-  rows: MonthAggregate[];
-}> {
+export async function getSpendingByMonth(args?: SpendingByMonthArgs) {
   const user = await getUserWithToken();
   if (user === "no-plaid-account") {
-    return { rows: [] };
+    return [];
   }
-  return spendingByMonthForUser(user.user, args);
+  return spendingByMonthForUser(args);
 }
 
 export const spendingForMonth = cache(
@@ -115,58 +108,38 @@ export const spendingForMonth = cache(
   }
 );
 
-// TODO: sql injection?
 const spendingByMonthForUser = cache(
-  async (
-    user: User,
-    { afterXMonthsAgo, excludeTags }: SpendingByMonthArgs = {}
-  ): Promise<{
-    rows: MonthAggregate[];
-  }> => {
-    return (await db.execute(
-      sql.raw(`
-      SELECT
-          DATE_TRUNC('month', t.date) AS month,
-          SUM(CAST(t.amount AS NUMERIC)) AS amount,
-          tv.tag,
-          tv.id as tag_id,
-          CASE
-              WHEN DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE)
-              THEN TRUE
-              ELSE FALSE
-          END AS is_current_month
-      FROM
-          transactions t
-      JOIN
-          tags_link_new tl ON t.transaction_id = tl.transaction_id
-      JOIN
-          tags_v2 tv ON tl.tag_id = tv.id
-      WHERE
-          t.user_id = ${user.id}
-          AND DATE_TRUNC('month', t.date) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '${
-            afterXMonthsAgo ?? 12
-          } months')
-          ${
-            excludeTags && excludeTags.length > 0
-              ? `AND tv.tag NOT IN (${excludeTags
-                  .map((tag) => `'${tag}'`)
-                  .join(", ")})`
-              : ""
-          }
-      GROUP BY
-          DATE_TRUNC('month', t.date), tv.id
-      ORDER BY
-          month;
-    `)
-    )) as {
-      rows: {
-        month: string;
-        amount: string;
-        tag: string;
-        tag_id: string;
-        is_current_month: boolean;
-      }[];
-    };
+  async ({ afterXMonthsAgo, excludeTags }: SpendingByMonthArgs = {}) => {
+    const user = await getUserWithToken();
+    if (user === "no-plaid-account") {
+      return null;
+    }
+    const filterConditions = getFilterConditions({
+      excludeTags,
+      afterXMonthsAgo,
+    });
+    console.log({ filterConditions });
+    return await db
+      .select({
+        month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
+        amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`,
+        tag: tags_new.tag,
+        tag_id: tags_new.id,
+        color: tags_new.color,
+      })
+      .from(transactions)
+      .innerJoin(
+        tagsLinkNew,
+        eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+      )
+      .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+      .where(and(eq(transactions.user_id, user.user.id), ...filterConditions))
+      .groupBy(
+        sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.id}, ${tags_new.label}`
+      )
+      .orderBy(
+        sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.label}, ${tags_new.id}`
+      );
   }
 );
 
