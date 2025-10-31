@@ -21,13 +21,18 @@ export async function getMonthTargetForTag(tag: string) {
     afterXMonthsAgo: 1,
   });
 
-  console.log({ thisAndLastMonthSpending });
-
   //TODO: this is a bit klunky, need to figure out a more expressive API
   const lastMonthIncome = thisAndLastMonthSpending?.reduce((acc, rows) => {
+    const rowMonth = new Date(rows.month);
+    const currentDate = new Date();
+    console.log({
+      rowMonth: rowMonth.getUTCMonth(),
+      currentDate: currentDate.getUTCMonth(),
+    });
     if (
       rows.tag !== "income" ||
-      rows.month === new Date().toISOString().slice(0, 7)
+      (rowMonth.getFullYear() === currentDate.getFullYear() &&
+        rowMonth.getUTCMonth() === currentDate.getUTCMonth())
     ) {
       return acc;
     }
