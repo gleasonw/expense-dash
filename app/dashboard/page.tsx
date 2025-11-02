@@ -2,18 +2,11 @@ import { addTransactions } from "@/app/dashboard/actions";
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
-import {
-  userTable,
-  tags_new,
-  tagsLinkNew,
-  transactions,
-  tagAllocationsNew,
-} from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
-import { and, eq, gte, lt, notInArray, sql } from "drizzle-orm";
+import { userTable, tags_new } from "@/server/schema";
+import { getUserWithTokenThrows } from "@/server/session";
+import { eq } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
 import * as R from "remeda";
-import { redirect } from "next/navigation";
 import {
   autoTagTransactions,
   getTransactionsWithTags,
@@ -24,13 +17,13 @@ import { toAppTransaction } from "@/app/dashboard/transaction_utils";
 import {
   getNetSpendingByMonth,
   spendingForMonth,
+  SpendingRow,
 } from "@/app/dashboard/aggregates";
 import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { IS_LOCAL_HOST } from "@/env";
 import * as dateUtils from "@/app/utils/dates";
 import { MonthPicker } from "@/app/dashboard/MonthPicker";
 import { TransactionDateEditor } from "@/app/dashboard/SpendingTable";
-import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { AddTagInput, RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
@@ -40,6 +33,7 @@ import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
 import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
 import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
+import { tagsByParent } from "@/app/dashboard/tag_utils";
 
 // TODO
 // break down transactions table into accounts (tabs probably make the most sense here)
@@ -50,7 +44,7 @@ export default async function Dashboard({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const userWithAccount = await getUserWithToken();
+  const userWithAccount = await getUserWithTokenThrows();
   const params = await searchParams;
   const filterByTag = params.tag as string | undefined;
   // should be postgres-readable, eg. 2022-01-01
@@ -59,10 +53,6 @@ export default async function Dashboard({
   const monthUTC = dateUtils.normYyyyMm(mParamString);
   console.log({ monthUTC });
 
-  // const pastXMonths = params.pastXMonths as string | undefined;
-  if (userWithAccount === "no-plaid-account") {
-    return redirect("/link");
-  }
   let latestTransactions;
   try {
     latestTransactions = await plaidClient.transactionsSync({
@@ -98,6 +88,8 @@ export default async function Dashboard({
     getNetSpendingByMonth({ monthUTC }),
     allUserTags(),
   ]);
+
+  console.log({ spending });
 
   const netSpendForSelectedMonth = netSpendForMonth?.at(0);
 
@@ -199,10 +191,7 @@ export default async function Dashboard({
 }
 
 async function TransactionFilters() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
+  const user = await getUserWithTokenThrows();
   const userTags = await db.query.tags_new.findMany({
     where: eq(tags_new.userId, user.user.id),
   });
@@ -221,58 +210,53 @@ async function TransactionFilters() {
 }
 
 async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-  const monthFilters = getFilterConditions({
-    monthUTC,
-  });
-  if (monthFilters.length === 0) {
-    monthFilters.push(
-      gte(transactions.date, sql`date_trunc('month', CURRENT_DATE)`)
-    );
-    monthFilters.push(
-      lt(
-        transactions.date,
-        sql`date_trunc('month', CURRENT_DATE + INTERVAL '1 month')`
-      )
-    );
-  }
-  const taggedSpendingByPeriod = await db
-    .select({
-      month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
-      amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`,
-      tag: tags_new.tag,
-      tagId: tags_new.id,
-      label: tags_new.label,
-      tag_id: tags_new.id,
-      color: tags_new.color,
-      allocation: tagAllocationsNew.allocation,
-    })
-    .from(transactions)
-    .innerJoin(
-      tagsLinkNew,
-      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
-    )
-    .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
-    .leftJoin(tagAllocationsNew, eq(tagAllocationsNew.tag_id, tags_new.id))
-    .where(
-      and(
-        eq(transactions.user_id, user.user.id),
-        notInArray(tags_new.tag, ["income", "transfer"]),
-        ...monthFilters
-      )
-    )
-    .groupBy(
-      sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.id, ${tagAllocationsNew.allocation}`
-    )
-    .orderBy(
-      sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.label, tags_v2.id`
-    );
+  const taggedSpendingByPeriod = await spendingForMonth({ monthUTC });
 
   console.log({ taggedSpendingByPeriod });
+  const toTrack = taggedSpendingByPeriod.filter(
+    (t) => t.tagAllocation !== null
+  );
 
+  const hierarchyForm = tagsByParent(toTrack);
+
+  const tags = await allUserTags();
+  return (
+    <div className="flex flex-col gap-5 w-full">
+      <AllocationEditContext>
+        {hierarchyForm.map((tagSpending) => {
+          if (!tagSpending) {
+            return <div key={tagSpending}>No allocation for {tagSpending}</div>;
+          }
+          return (
+            <TagAllocation
+              key={tagSpending.parent.tag}
+              tagSpending={tagSpending.parent}
+            >
+              {tagSpending.children.map((childTagSpending) => (
+                <div key={childTagSpending.tag_id} className="ml-6 mt-2">
+                  <TagAllocation tagSpending={childTagSpending} />
+                </div>
+              ))}
+            </TagAllocation>
+          );
+        })}
+        <CreateAllocationForm tags={tags} />
+
+        <div className="ml-auto">
+          <AllocationEditButton />
+        </div>
+      </AllocationEditContext>
+    </div>
+  );
+}
+
+async function TagAllocation({
+  tagSpending,
+  children,
+}: {
+  tagSpending: SpendingRow;
+  children?: React.ReactNode;
+}) {
   const estimatedIncomeAndExpenses = await spendingForMonth({
     monthUTC: `${new Date().getUTCFullYear()}-${String(
       new Date().getUTCMonth()
@@ -289,76 +273,55 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
 
   const { income } = R.groupBy(estimatedIncomeAndExpenses, (r) => r.tag);
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
-  const toTrack = taggedSpendingByPeriod.filter((t) => t.allocation !== null);
-
-  const tags = await allUserTags();
+  const allocation = parseInt(tagSpending?.tagAllocation ?? "0", 10);
+  const targetSpending = (allocation / 100) * estIncome;
   return (
-    <div className="flex flex-col gap-5 w-full">
-      <AllocationEditContext>
-        <div className="flex gap-4 flex-wrap">
-          {toTrack.map((tagSpending) => {
-            if (!tagSpending) {
-              return (
-                <div key={tagSpending}>No allocation for {tagSpending}</div>
-              );
-            }
-            const allocation = parseInt(tagSpending?.allocation ?? "0", 10);
-            const targetSpending = (allocation / 100) * estIncome;
-            return (
-              <div key={tagSpending.tagId} className="w-full flex">
-                <div className="flex-col gap-2 w-full flex">
-                  <div className="flex gap-2 justify-between text-sm">
-                    <div>{tagSpending.label}</div>
-                    <div>
-                      ${tagSpending.amount} / ${Math.round(targetSpending)}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="w-full h-3 overflow-hidden border rounded">
-                      <div
-                        className={`relative h-full bg-${tagSpending.color}-400`}
-                        style={{
-                          width: `${
-                            (Number(tagSpending.amount) / targetSpending) * 100
-                          }%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="flex w-full justify-between">
-                      <div className="text-sm text-gray-500">
-                        <span className="text-lg pr-2 text-black">
-                          {isNaN(Number(tagSpending.amount)) ? (
-                            <span className="text-right">
-                              ${targetSpending.toFixed(2)}
-                            </span>
-                          ) : (
-                            <span className="text-right">
-                              $
-                              {Math.round(
-                                targetSpending - Number(tagSpending.amount)
-                              )}
-                            </span>
-                          )}
-                        </span>
-                        left to spend
-                      </div>
-                      <span className="text-sm align-bottom text-gray-500 px-2">
-                        {isNaN(allocation) ? 0 : allocation}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <AllocationDeleteButton tagId={tagSpending.tagId} />
+    <div className="flex flex-col">
+      <div key={tagSpending.tag_id} className="w-full flex">
+        <div className="flex-col gap-2 w-full flex">
+          <div className="flex gap-2 justify-between text-sm">
+            <div>{tagSpending.tag}</div>
+            <div>
+              ${tagSpending.amount} / ${Math.round(targetSpending)}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="w-full h-3 overflow-hidden border rounded">
+              <div
+                className={`relative h-full bg-${tagSpending.color}-400`}
+                style={{
+                  width: `${
+                    (Number(tagSpending.amount) / targetSpending) * 100
+                  }%`,
+                }}
+              ></div>
+            </div>
+            <div className="flex w-full justify-between">
+              <div className="text-sm text-gray-500">
+                <span className="text-lg pr-2 text-black">
+                  {isNaN(Number(tagSpending.amount)) ? (
+                    <span className="text-right">
+                      ${targetSpending.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-right">
+                      ${Math.round(targetSpending - Number(tagSpending.amount))}
+                    </span>
+                  )}
+                </span>
+                left to spend
               </div>
-            );
-          })}
-          <CreateAllocationForm tags={tags} />
-
-          <div className="ml-auto">
-            <AllocationEditButton />
+              <span className="text-sm align-bottom text-gray-500 px-2">
+                {isNaN(allocation) ? 0 : allocation}%
+              </span>
+            </div>
           </div>
         </div>
-      </AllocationEditContext>
+        {tagSpending.tag_id && (
+          <AllocationDeleteButton tagId={tagSpending.tag_id} />
+        )}
+      </div>
+      {children}
     </div>
   );
 }

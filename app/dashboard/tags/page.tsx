@@ -2,11 +2,11 @@ import { createTag } from "@/app/dashboard/actions";
 import { TagColorPicker } from "@/app/dashboard/TagColorPicker";
 import { db } from "@/server/db";
 import { tags_new } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { eq, asc } from "drizzle-orm";
 
 export default async function TagsPage() {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return <div>Please connect your bank account to use this feature.</div>;
   }
@@ -28,7 +28,7 @@ export default async function TagsPage() {
 }
 
 async function TagMaker() {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return <div>no plaid</div>;
   }

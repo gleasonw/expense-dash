@@ -7,7 +7,7 @@ import {
   tagsLinkNew,
   transactions,
 } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { and, inArray, eq, or, notInArray, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cache } from "react";
@@ -17,7 +17,7 @@ import { getFilterConditions } from "@/app/utils/transactions_querys";
 
 /**developer utility, helpful when booting up a new deployment */
 export async function tagAllAsFirstTag() {
-  const userWithAccount = await getUserWithToken();
+  const userWithAccount = await getUserWithTokenThrows();
   if (userWithAccount === "no-plaid-account") {
     console.error(`no plaid account`);
     return {
@@ -66,7 +66,7 @@ export async function tagAllAsFirstTag() {
 }
 
 export async function tryAutoTagTransactions() {
-  const userWithAccount = await getUserWithToken();
+  const userWithAccount = await getUserWithTokenThrows();
   if (userWithAccount === "no-plaid-account") {
     console.error(`no plaid account`);
     return {
@@ -107,7 +107,7 @@ export async function autoTagTransactions(
   }[]
 ) {
   console.log(`attemping auto tag`, ts.length);
-  const userWithAccount = await getUserWithToken();
+  const userWithAccount = await getUserWithTokenThrows();
   if (userWithAccount === "no-plaid-account") {
     console.error(`no plaid account`);
     return {
@@ -178,7 +178,7 @@ export async function autoTagTransactions(
 
 export const getTransactionsWithTags = cache(
   async (filters?: { tag?: string; monthUTC?: dateUtils.YyyyMm }) => {
-    const userWithAccount = await getUserWithToken();
+    const userWithAccount = await getUserWithTokenThrows();
     if (userWithAccount === "no-plaid-account") {
       return [];
     }

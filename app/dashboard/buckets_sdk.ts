@@ -1,11 +1,11 @@
 import { getMonthTargetForTag } from "@/app/dashboard/aggregates";
 import { db } from "@/server/db";
 import { buckets } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { and, count, eq, ne } from "drizzle-orm";
 
 export async function getBuckets() {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return [];
   }
@@ -20,7 +20,7 @@ export async function getBuckets() {
 }
 
 export async function totalGoalBuckets() {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return 0;
   }
@@ -38,7 +38,7 @@ export async function totalGoalBuckets() {
 }
 
 export async function remainingSavingsAfterOngoing() {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return 0;
   }
