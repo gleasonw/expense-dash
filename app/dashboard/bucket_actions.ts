@@ -7,12 +7,12 @@ import {
   PostBucket,
   PostMovement,
 } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function removeMovementsFromBucket(bucketId: number) {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return {
       error: "no-plaid-account",
@@ -33,7 +33,7 @@ export async function removeMovementsFromBucket(bucketId: number) {
 }
 
 export async function deleteBucket(bucketId: number) {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return {
       error: "no-plaid-account",
@@ -52,7 +52,7 @@ export async function deleteBucket(bucketId: number) {
 }
 
 export async function createBucket(bucket: Omit<PostBucket, "userId">) {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return {
       error: "no-plaid-account",
@@ -72,7 +72,7 @@ export async function createBucket(bucket: Omit<PostBucket, "userId">) {
 }
 
 export async function createMovement(movement: Omit<PostMovement, "userId">) {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return {
       error: "no-plaid-account",

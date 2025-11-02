@@ -1,11 +1,11 @@
 import { db } from "@/server/db";
 import { tags_new } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { eq } from "drizzle-orm";
 import { cache } from "react";
 
 export const allUserTags = cache(async function allUserTags() {
-  const user = await getUserWithToken();
+  const user = await getUserWithTokenThrows();
   if (user === "no-plaid-account") {
     return [];
   }

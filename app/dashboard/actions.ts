@@ -2,7 +2,7 @@
 "use server";
 
 import { db } from "@/server/db";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import {
   auto_tag_merchants_new,
   tagAllocationsNew,
@@ -22,10 +22,7 @@ export async function removeTagFromTransaction({
   transactionId: string;
   tagId: string;
 }) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  await getUserWithTokenThrows();
   await db
     .delete(tagsLinkNew)
     .where(
@@ -38,10 +35,7 @@ export async function removeTagFromTransaction({
 }
 
 export async function createTag(formData: FormData) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  const user = await getUserWithTokenThrows();
   const tag = formData.get("tag") as string;
   await db.insert(tags_new).values({
     tag,
@@ -56,10 +50,7 @@ export async function updateTransactionDate(
   transactionId: string,
   date: string
 ) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  const user = await getUserWithTokenThrows();
   console.log("updating transaction date", {
     transactionId,
     date,
@@ -84,10 +75,7 @@ export async function setTagAllocation(formData: FormData) {
     }))
     .filter((a) => !isNaN(parseFloat(a.allocation as string)));
   console.log({ allocations });
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  const user = await getUserWithTokenThrows();
   console.log({ user, allocations });
 
   await db
@@ -109,10 +97,7 @@ export async function setTagAllocation(formData: FormData) {
 export async function addTransactions(
   ts: (Transaction & { amount: string })[]
 ) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  const user = await getUserWithTokenThrows();
   return db
     .insert(transactions)
     .values(
@@ -138,10 +123,7 @@ export type FormTagTransactionState = Record<
 export async function addTagsToTransactions(
   tags: FormTagTransactionState
 ): Promise<void> {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  await getUserWithTokenThrows();
 
   const tagsToPush = Object.entries(tags).map(([id, { autoTag }]) => {
     const { transactionId, tagId } = tagIdAndTransactionIdFromId(
@@ -174,11 +156,7 @@ export async function addTagToTransaction_v2({
     tagId,
     autoTag,
   });
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    // gotta figure out a way to do middleware or something and pass user as context, like trpc
-    throw new Error("no plaid account");
-  }
+  const user = await getUserWithTokenThrows();
   const [fullTag, fullTransaction] = await Promise.all([
     db.query.tags_new.findFirst({
       where: and(eq(tags_new.userId, user.user.id), eq(tags_new.id, tagId)),

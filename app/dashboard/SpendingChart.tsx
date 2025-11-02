@@ -4,14 +4,10 @@ import * as Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
 import { useMemo } from "react";
 import "./highcharts.css";
+import { SpendingRow } from "@/app/dashboard/aggregates";
 
 type SpendingChartProps = {
-  discretionaryByMonth: Array<{
-    month: string;
-    tag: string;
-    amount: string;
-    color: string;
-  }>;
+  discretionaryByMonth: Array<SpendingRow>;
 };
 
 export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
@@ -23,7 +19,7 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
       const spending = parseFloat(row.amount);
 
       if (!acc[tag]) {
-        acc[tag] = { data: [], color: row.color };
+        acc[tag] = { data: [], color: row.color ?? "" };
       }
 
       acc[tag].data.push({ name: month, y: spending });
