@@ -13,12 +13,6 @@ import { revalidatePath } from "next/cache";
 
 export async function removeMovementsFromBucket(bucketId: number) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
   console.log("Removing movements from bucket", { bucketId, user: user.user });
   await db
     .delete(bucketMovements)
@@ -34,12 +28,6 @@ export async function removeMovementsFromBucket(bucketId: number) {
 
 export async function deleteBucket(bucketId: number) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
   console.log("Deleting bucket", { bucketId, user: user.user });
   await db
     .delete(buckets)
@@ -53,12 +41,6 @@ export async function deleteBucket(bucketId: number) {
 
 export async function createBucket(bucket: Omit<PostBucket, "userId">) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
   console.log("Creating bucket", { bucket, user: user.user });
   await db.insert(buckets).values({
     ...bucket,
@@ -73,12 +55,6 @@ export async function createBucket(bucket: Omit<PostBucket, "userId">) {
 
 export async function createMovement(movement: Omit<PostMovement, "userId">) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
   console.log("Creating movement", { movement, user: user.user });
   await db.insert(bucketMovements).values({
     ...movement,

@@ -18,13 +18,6 @@ import { getFilterConditions } from "@/app/utils/transactions_querys";
 /**developer utility, helpful when booting up a new deployment */
 export async function tagAllAsFirstTag() {
   const userWithAccount = await getUserWithTokenThrows();
-  if (userWithAccount === "no-plaid-account") {
-    console.error(`no plaid account`);
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
   try {
     const transactionsWithNoTag = await db
       .select()
@@ -67,13 +60,6 @@ export async function tagAllAsFirstTag() {
 
 export async function tryAutoTagTransactions() {
   const userWithAccount = await getUserWithTokenThrows();
-  if (userWithAccount === "no-plaid-account") {
-    console.error(`no plaid account`);
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
   try {
     const transactionsWithNoTag = await db
       .select()
@@ -108,13 +94,6 @@ export async function autoTagTransactions(
 ) {
   console.log(`attemping auto tag`, ts.length);
   const userWithAccount = await getUserWithTokenThrows();
-  if (userWithAccount === "no-plaid-account") {
-    console.error(`no plaid account`);
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
   console.log(
     "here are some names",
     ts.map((t) => t.name)
@@ -178,10 +157,7 @@ export async function autoTagTransactions(
 
 export const getTransactionsWithTags = cache(
   async (filters?: { tag?: string; monthUTC?: dateUtils.YyyyMm }) => {
-    const userWithAccount = await getUserWithTokenThrows();
-    if (userWithAccount === "no-plaid-account") {
-      return [];
-    }
+    await getUserWithTokenThrows();
     const filterConditions = getFilterConditions(filters);
     if (filters?.tag) {
       filterConditions.push(eq(tags_new.tag, filters.tag));

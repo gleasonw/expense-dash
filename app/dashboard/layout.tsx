@@ -10,9 +10,6 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return <div>No plaid account</div>;
-  }
   const tags = await db.query.tags_new.findMany({
     where: eq(tags_new.userId, user.user.id),
   });

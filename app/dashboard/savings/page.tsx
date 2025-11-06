@@ -25,14 +25,7 @@ import { sql } from "drizzle-orm";
 // reflects percentage of savings target
 
 export default async function Savings() {
-  const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return (
-      <div className="p-3">
-        <p>You need to connect your bank account to use this feature.</p>
-      </div>
-    );
-  }
+  await getUserWithTokenThrows();
   const rows = await getSpendingByMonth({ afterXMonthsAgo: 1 });
   const buckets = await getBuckets();
 
@@ -93,14 +86,6 @@ export default async function Savings() {
 async function SavingsWarnings() {
   const warnings = [];
   const user = await getUserWithTokenThrows();
-
-  if (user === "no-plaid-account") {
-    return (
-      <div className="text-red-500">
-        You need to connect your bank account to see savings warnings.
-      </div>
-    );
-  }
 
   // TODO: parallelize
   const savingsTarget = await getMonthTargetForTag("savings");

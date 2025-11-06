@@ -141,6 +141,7 @@ export function spendingForMonth({
     );
 
     // 2) Fan-out ancestors: a/b/c -> a, a/b, a/b/c
+    // @ts-expect-error Drizzle typing issue with generate_series
     const ancestors = db.$with("ancestors").as(sql`
       SELECT
         li.month,
