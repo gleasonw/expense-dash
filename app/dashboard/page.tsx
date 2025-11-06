@@ -216,7 +216,10 @@ async function TransactionFilters() {
 }
 
 async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
-  const taggedSpendingByPeriod = await spendingForMonth({ monthUTC });
+  const taggedSpendingByPeriod = await spendingForMonth({
+    monthUTC,
+    excludeTags: ["income", "transfer"],
+  });
 
   console.log({ taggedSpendingByPeriod });
   const toTrack = taggedSpendingByPeriod;

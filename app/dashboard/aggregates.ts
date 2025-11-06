@@ -127,15 +127,7 @@ export function spendingForMonth({
           and(
             eq(transactions.user_id, user.user.id),
             ...filterConditions,
-            ...subtreeExcludes,
-            // income/transfer global excludes (if you want them here):
-            sql`NOT EXISTS (
-              SELECT 1
-              FROM ${tagsLinkNew} tl2
-              INNER JOIN ${tags_new} t2 ON tl2.tag_id = t2.id
-              WHERE tl2.transaction_id = ${transactions.transaction_id}
-              AND t2.tag IN ('income','transfer')
-            )`
+            ...subtreeExcludes
           )
         )
         .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), ${T.tag}`)
