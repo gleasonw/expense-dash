@@ -61,7 +61,7 @@ export const getCurrentSession = cache(async () => {
 });
 
 /** we throw here since we assume the layout has already checked that the user is logged in */
-export const getUserWithToken = cache(async () => {
+export const getUserWithTokenThrows = cache(async () => {
   const sessionUser = await getCurrentSession();
   console.log({ sessionUser });
   if (!sessionUser.user) {
@@ -74,7 +74,7 @@ export const getUserWithToken = cache(async () => {
   if (res.length === 0) {
     // i don't think this should ever happen?
     console.error("no plaid accounts found for user", { sessionUser });
-    return "no-plaid-account";
+    throw new Response(`no plaid accounts found for user`, { status: 404 });
   }
   return {
     user: sessionUser.user,

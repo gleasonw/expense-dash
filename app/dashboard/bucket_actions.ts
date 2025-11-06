@@ -7,18 +7,12 @@ import {
   PostBucket,
   PostMovement,
 } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function removeMovementsFromBucket(bucketId: number) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
+  const user = await getUserWithTokenThrows();
   console.log("Removing movements from bucket", { bucketId, user: user.user });
   await db
     .delete(bucketMovements)
@@ -33,13 +27,7 @@ export async function removeMovementsFromBucket(bucketId: number) {
 }
 
 export async function deleteBucket(bucketId: number) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
+  const user = await getUserWithTokenThrows();
   console.log("Deleting bucket", { bucketId, user: user.user });
   await db
     .delete(buckets)
@@ -52,13 +40,7 @@ export async function deleteBucket(bucketId: number) {
 }
 
 export async function createBucket(bucket: Omit<PostBucket, "userId">) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
+  const user = await getUserWithTokenThrows();
   console.log("Creating bucket", { bucket, user: user.user });
   await db.insert(buckets).values({
     ...bucket,
@@ -72,13 +54,7 @@ export async function createBucket(bucket: Omit<PostBucket, "userId">) {
 }
 
 export async function createMovement(movement: Omit<PostMovement, "userId">) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return {
-      error: "no-plaid-account",
-      message: "You need to connect your bank account to use this feature.",
-    };
-  }
+  const user = await getUserWithTokenThrows();
   console.log("Creating movement", { movement, user: user.user });
   await db.insert(bucketMovements).values({
     ...movement,

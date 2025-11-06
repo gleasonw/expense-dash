@@ -1,14 +1,11 @@
 import { getMonthTargetForTag } from "@/app/dashboard/aggregates";
 import { db } from "@/server/db";
 import { buckets } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { and, count, eq, ne } from "drizzle-orm";
 
 export async function getBuckets() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return [];
-  }
+  const user = await getUserWithTokenThrows();
   const buckets = await db.query.buckets.findMany({
     where: (buckets, { eq }) => eq(buckets.userId, user.user.id),
     with: {
@@ -20,10 +17,7 @@ export async function getBuckets() {
 }
 
 export async function totalGoalBuckets() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return 0;
-  }
+  const user = await getUserWithTokenThrows();
   const total = await db
     .select({ count: count().as("total") })
     .from(buckets)
@@ -38,10 +32,7 @@ export async function totalGoalBuckets() {
 }
 
 export async function remainingSavingsAfterOngoing() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return 0;
-  }
+  await getUserWithTokenThrows();
   const savingsTarget = await getMonthTargetForTag("savings");
   const buckets = await getBuckets();
   const percentAllocated = buckets.reduce((acc, bucket) => {
