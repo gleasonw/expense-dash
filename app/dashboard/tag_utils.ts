@@ -35,3 +35,8 @@ export function tagsByParent<T extends { tag: string }>(tags: T[]) {
     children: T[];
   }>;
 }
+
+export function lowestTagForString(tagString: string): string {
+  const parts = tagString.split("/");
+  return parts.at(-1)!;
+}
