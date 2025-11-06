@@ -50,6 +50,44 @@ export async function createTag(formData: FormData) {
     userId: user.user.id,
   });
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tags");
+}
+
+export async function deleteTag({ tagId }: { tagId: string }) {
+  const user = await getUserWithToken();
+  if (user === "no-plaid-account") {
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    const tag = await tx.query.tags_new.findFirst({
+      where: and(eq(tags_new.id, tagId), eq(tags_new.userId, user.user.id)),
+    });
+
+    if (!tag) {
+      return;
+    }
+
+    await tx
+      .delete(tagsLinkNew)
+      .where(eq(tagsLinkNew.tag_id, tagId));
+
+    await tx
+      .delete(tagAllocationsNew)
+      .where(
+        and(
+          eq(tagAllocationsNew.tag_id, tagId),
+          eq(tagAllocationsNew.user_id, user.user.id)
+        )
+      );
+
+    await tx
+      .delete(tags_new)
+      .where(and(eq(tags_new.id, tagId), eq(tags_new.userId, user.user.id)));
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tags");
 }
 
 export async function updateTransactionDate(
