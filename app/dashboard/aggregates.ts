@@ -84,6 +84,7 @@ export type SpendingRow = {
   tag_id: string | null;
   color: string | null;
   tagAllocation: string | null;
+  depth: number;
 };
 
 export function spendingForMonth({
@@ -163,6 +164,7 @@ export function spendingForMonth({
         tag_id: sql<string | null>`t.id`,
         color: sql<string | null>`t.color`,
         tagAllocation: sql<string | null>`tag_allocations_new.allocation`,
+        depth: sql<number>`MIN(a.depth)`,
       })
       .from(sql`ancestors a`)
       .leftJoin(T, eq(sql`a.bucket_tag`, sql`t.tag`))

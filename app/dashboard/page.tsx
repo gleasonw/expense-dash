@@ -2,9 +2,14 @@ import { addTransactions } from "@/app/dashboard/actions";
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { plaidClient } from "@/server/plaid";
 import { db } from "@/server/db";
-import { userTable, tags_new } from "@/server/schema";
+import {
+  userTable,
+  tags_new,
+  tagsLinkNew,
+  transactions,
+} from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as style from "@/app/dashboard/dashboard.module.css";
 import * as R from "remeda";
 import {
@@ -33,7 +38,8 @@ import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
 import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
 import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
-import { tagsByParent } from "@/app/dashboard/tag_utils";
+import { lowestTagForString, tagsByParent } from "@/app/dashboard/tag_utils";
+import { getFilterConditions } from "@/app/utils/transactions_querys";
 
 // TODO
 // break down transactions table into accounts (tabs probably make the most sense here)
@@ -227,33 +233,45 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
           }
           return (
             <TagAllocation
+              monthUTC={monthUTC}
               key={tagSpending.parent.tag}
               tagSpending={tagSpending.parent}
             >
               {tagSpending.children.map((childTagSpending) => (
-                <div key={childTagSpending.tag_id} className="ml-10 mt-2">
-                  <TagAllocation tagSpending={childTagSpending} />
-                </div>
+                <TagChild key={childTagSpending.tag_id}>
+                  <TagAllocation
+                    monthUTC={monthUTC}
+                    tagSpending={childTagSpending}
+                  />
+                </TagChild>
               ))}
             </TagAllocation>
           );
         })}
-        <CreateAllocationForm tags={tags} />
+        <div className="flex justify-between">
+          <CreateAllocationForm tags={tags} />
 
-        <div className="ml-auto">
-          <AllocationEditButton />
+          <div className="ml-auto">
+            <AllocationEditButton />
+          </div>
         </div>
       </AllocationEditContext>
     </div>
   );
 }
 
+function TagChild({ children }: { children: React.ReactNode }) {
+  return <div className="ml-10 mt-2">{children}</div>;
+}
+
 async function TagAllocation({
   tagSpending,
   children,
+  monthUTC,
 }: {
   tagSpending: SpendingRow;
   children?: React.ReactNode;
+  monthUTC: dateUtils.YyyyMm;
 }) {
   const estimatedIncomeAndExpenses = await spendingForMonth({
     monthUTC: `${new Date().getUTCFullYear()}-${String(
@@ -271,12 +289,20 @@ async function TagAllocation({
 
   if (!tagSpending.tagAllocation) {
     return (
-      <div>
-        <div className="flex gap-2">
-          <span>{tagSpending.tag}</span>
-          <span className="opacity-50">${tagSpending.amount}</span>
+      <div className="">
+        <div className="flex gap-2 w-full justify-between">
+          <span>{lowestTagForString(tagSpending.tag)}</span>
+          <span className={tagSpending.depth === 1 ? "" : "opacity-50"}>
+            ${tagSpending.amount}
+          </span>
         </div>
-        <div>{children}</div>
+        <div>
+          {tagSpending.depth === 1 ? (
+            <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
+          ) : null}
+
+          {children}
+        </div>
       </div>
     );
   }
@@ -331,8 +357,59 @@ async function TagAllocation({
           <AllocationDeleteButton tagId={tagSpending.tag_id} />
         )}
       </div>
+      {tagSpending.depth === 1 ? (
+        <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
+      ) : null}
       {children}
     </div>
+  );
+}
+
+/** spending that is not marked to a child tag like {parent}/{child}, just {parent} */
+async function RootSpendingForTag({
+  spending,
+  monthUTC,
+}: {
+  spending: SpendingRow;
+  monthUTC: dateUtils.YyyyMm;
+}) {
+  const user = await getUserWithTokenThrows();
+  const filterConditions = getFilterConditions({ monthUTC });
+  if (!spending.tag_id) {
+    return null;
+  }
+  const baseSpendResults = await db
+    .select({
+      month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
+      amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC)) as amount`,
+      full_tag: sql<string>`${tags_new.tag} as full_tag`,
+    })
+    .from(transactions)
+    .innerJoin(
+      tagsLinkNew,
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+    )
+    .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+    .where(
+      and(
+        eq(transactions.user_id, user.user.id),
+        eq(tags_new.id, spending.tag_id),
+        ...filterConditions
+      )
+    )
+    .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.tag}`);
+  const baseSpend = baseSpendResults?.at(0);
+
+  if (!baseSpend) {
+    return null;
+  }
+  return (
+    <TagChild>
+      <div className="flex gap-2 w-full justify-between">
+        <span>{baseSpend.full_tag}</span>
+        <span className="opacity-50">${baseSpend.amount}</span>
+      </div>
+    </TagChild>
   );
 }
 
