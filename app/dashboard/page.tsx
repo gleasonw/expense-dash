@@ -213,9 +213,7 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
   const taggedSpendingByPeriod = await spendingForMonth({ monthUTC });
 
   console.log({ taggedSpendingByPeriod });
-  const toTrack = taggedSpendingByPeriod.filter(
-    (t) => t.tagAllocation !== null
-  );
+  const toTrack = taggedSpendingByPeriod;
 
   const hierarchyForm = tagsByParent(toTrack);
 
@@ -233,7 +231,7 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
               tagSpending={tagSpending.parent}
             >
               {tagSpending.children.map((childTagSpending) => (
-                <div key={childTagSpending.tag_id} className="ml-6 mt-2">
+                <div key={childTagSpending.tag_id} className="ml-10 mt-2">
                   <TagAllocation tagSpending={childTagSpending} />
                 </div>
               ))}
@@ -269,6 +267,18 @@ async function TagAllocation({
 
   if (estimatedIncomeAndExpenses?.length === 0) {
     return null;
+  }
+
+  if (!tagSpending.tagAllocation) {
+    return (
+      <div>
+        <div className="flex gap-2">
+          <span>{tagSpending.tag}</span>
+          <span className="opacity-50">${tagSpending.amount}</span>
+        </div>
+        <div>{children}</div>
+      </div>
+    );
   }
 
   const { income } = R.groupBy(estimatedIncomeAndExpenses, (r) => r.tag);

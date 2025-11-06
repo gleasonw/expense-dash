@@ -13,9 +13,6 @@ import { revalidatePath } from "next/cache";
 
 export async function updateTag(tag: UpdateTag) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return;
-  }
   if (user.user.id !== tag.userId) {
     return;
   }
@@ -33,9 +30,6 @@ export async function createAllocationForTag(
   upsertTag: Omit<TagAllocationUpsert, "user_id">
 ) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return;
-  }
   const result = await db
     .insert(tagAllocationsNew)
     .values({
@@ -49,9 +43,6 @@ export async function createAllocationForTag(
 
 export async function deleteAllocationForTag(tagId: string) {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return;
-  }
   await db
     .delete(tagAllocationsNew)
     .where(

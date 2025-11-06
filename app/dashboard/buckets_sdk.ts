@@ -6,9 +6,6 @@ import { and, count, eq, ne } from "drizzle-orm";
 
 export async function getBuckets() {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return [];
-  }
   const buckets = await db.query.buckets.findMany({
     where: (buckets, { eq }) => eq(buckets.userId, user.user.id),
     with: {
@@ -21,9 +18,6 @@ export async function getBuckets() {
 
 export async function totalGoalBuckets() {
   const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return 0;
-  }
   const total = await db
     .select({ count: count().as("total") })
     .from(buckets)
@@ -38,10 +32,7 @@ export async function totalGoalBuckets() {
 }
 
 export async function remainingSavingsAfterOngoing() {
-  const user = await getUserWithTokenThrows();
-  if (user === "no-plaid-account") {
-    return 0;
-  }
+  await getUserWithTokenThrows();
   const savingsTarget = await getMonthTargetForTag("savings");
   const buckets = await getBuckets();
   const percentAllocated = buckets.reduce((acc, bucket) => {
