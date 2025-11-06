@@ -14,7 +14,7 @@ import { MarkOngoingCompleteButton } from "@/app/dashboard/savings/MarkOngoingCo
 import { MovementForm } from "@/app/dashboard/savings/MovementForm";
 import { RemoveMovementsFromBucketButton } from "@/app/dashboard/savings/RemoveMovementsFromBucketButton";
 import { db } from "@/server/db";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { sql } from "drizzle-orm";
 
 // TODO: completion status for buckets...
@@ -25,14 +25,7 @@ import { sql } from "drizzle-orm";
 // reflects percentage of savings target
 
 export default async function Savings() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return (
-      <div className="p-3">
-        <p>You need to connect your bank account to use this feature.</p>
-      </div>
-    );
-  }
+  await getUserWithTokenThrows();
   const rows = await getSpendingByMonth({ afterXMonthsAgo: 1 });
   const buckets = await getBuckets();
 
@@ -92,15 +85,7 @@ export default async function Savings() {
 
 async function SavingsWarnings() {
   const warnings = [];
-  const user = await getUserWithToken();
-
-  if (user === "no-plaid-account") {
-    return (
-      <div className="text-red-500">
-        You need to connect your bank account to see savings warnings.
-      </div>
-    );
-  }
+  const user = await getUserWithTokenThrows();
 
   // TODO: parallelize
   const savingsTarget = await getMonthTargetForTag("savings");

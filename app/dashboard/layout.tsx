@@ -1,7 +1,7 @@
 import { Providers } from "@/app/dashboard/Providers";
 import { db } from "@/server/db";
 import { tags_new } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { eq } from "drizzle-orm";
 
 export default async function DashboardLayout({
@@ -9,10 +9,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>No plaid account</div>;
-  }
+  const user = await getUserWithTokenThrows();
   const tags = await db.query.tags_new.findMany({
     where: eq(tags_new.userId, user.user.id),
   });

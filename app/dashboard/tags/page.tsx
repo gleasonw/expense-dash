@@ -2,14 +2,11 @@ import { createTag, deleteTag } from "@/app/dashboard/actions";
 import { TagColorPicker } from "@/app/dashboard/TagColorPicker";
 import { db } from "@/server/db";
 import { Tag, tags_new } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { eq, asc } from "drizzle-orm";
 
 export default async function TagsPage() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>Please connect your bank account to use this feature.</div>;
-  }
+  const user = await getUserWithTokenThrows();
   const userTags = await db
     .select()
     .from(tags_new)
@@ -28,11 +25,6 @@ export default async function TagsPage() {
 }
 
 async function TagMaker() {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return <div>no plaid</div>;
-  }
-
   return (
     <form action={createTag} className="flex gap-3">
       <input

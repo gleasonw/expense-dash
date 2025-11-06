@@ -1,9 +1,15 @@
 import { YyyyMm } from "@/app/utils/dates";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { db } from "@/server/db";
-import { tags_new, tagsLinkNew, transactions } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import {
+  tagAllocationsNew,
+  tags_new,
+  tagsLinkNew,
+  transactions,
+} from "@/server/schema";
+import { getUserWithTokenThrows } from "@/server/session";
 import { and, asc, eq, exists, inArray, notExists, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { cache } from "react";
 
 type SpendingByMonthArgs = {
@@ -13,10 +19,7 @@ type SpendingByMonthArgs = {
 
 // TODO: clean this up... very closet drawer
 export async function getMonthTargetForTag(tag: string) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return null;
-  }
+  const user = await getUserWithTokenThrows();
   const thisAndLastMonthSpending = await getSpendingByMonth({
     afterXMonthsAgo: 1,
   });
@@ -71,54 +74,109 @@ export async function getMonthTargetForTag(tag: string) {
 }
 
 export async function getSpendingByMonth(args?: SpendingByMonthArgs) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return [];
-  }
   return spendingByMonthForUser(args);
 }
 
-export const spendingForMonth = cache(
-  async ({
-    monthUTC,
-    excludeTags,
-  }: {
-    monthUTC?: YyyyMm;
-    excludeTags?: string[];
-  }) => {
-    const user = await getUserWithToken();
-    if (user === "no-plaid-account") {
-      return null;
-    }
+export type SpendingRow = {
+  month: string;
+  amount: string;
+  tag: string;
+  tag_id: string | null;
+  color: string | null;
+  tagAllocation: string | null;
+};
+
+export function spendingForMonth({
+  monthUTC,
+  excludeTags,
+}: {
+  monthUTC?: YyyyMm;
+  excludeTags?: Array<string>;
+}): Promise<Array<SpendingRow>> {
+  return cache(async () => {
+    const user = await getUserWithTokenThrows();
     const filterConditions = getFilterConditions({ monthUTC, excludeTags });
+
+    // Use one alias consistently for the tags table.
+    const T = alias(tags_new, "t");
+
+    // subtree excludes (node + descendants) applied ONCE at line_items stage
+    const subtreeExcludes =
+      excludeTags && excludeTags.length
+        ? excludeTags.map(
+            (p) => sql`NOT (${T.tag} = ${p} OR ${T.tag} LIKE ${p + "/"} || '%')`
+          )
+        : [];
+
+    // 1) Line-items at full tag granularity (keep full path)
+    const lineItems = db.$with("line_items").as(
+      db
+        .select({
+          month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
+          amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC)) as amount`,
+          full_tag: sql<string>`T.tag as full_tag`,
+        })
+        .from(transactions)
+        .innerJoin(
+          tagsLinkNew,
+          eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+        )
+        .innerJoin(T, eq(tagsLinkNew.tag_id, T.id))
+        .where(
+          and(
+            eq(transactions.user_id, user.user.id),
+            ...filterConditions,
+            ...subtreeExcludes,
+            // income/transfer global excludes (if you want them here):
+            sql`NOT EXISTS (
+              SELECT 1
+              FROM ${tagsLinkNew} tl2
+              INNER JOIN ${tags_new} t2 ON tl2.tag_id = t2.id
+              WHERE tl2.transaction_id = ${transactions.transaction_id}
+              AND t2.tag IN ('income','transfer')
+            )`
+          )
+        )
+        .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), ${T.tag}`)
+    );
+
+    // 2) Fan-out ancestors: a/b/c -> a, a/b, a/b/c
+    // @ts-expect-error Drizzle typing issue with generate_series
+    const ancestors = db.$with("ancestors").as(sql`
+      SELECT
+        li.month,
+        li.amount,
+        array_to_string((regexp_split_to_array(li.full_tag, '/'))[1:gs], '/') AS bucket_tag,
+        gs AS depth
+      FROM ${lineItems} li
+      CROSS JOIN LATERAL generate_series(
+        1, cardinality(regexp_split_to_array(li.full_tag, '/'))
+      ) AS gs
+    `);
+
     return await db
+      .with(lineItems, ancestors)
       .select({
-        month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
-        amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`,
-        tag: tags_new.tag,
-        tag_id: tags_new.id,
-        color: tags_new.color,
+        month: sql<string>`a.month`,
+        amount: sql<string>`SUM(a.amount)`,
+        tag: sql<string>`a.bucket_tag`,
+        tag_id: sql<string | null>`t.id`,
+        color: sql<string | null>`t.color`,
+        tagAllocation: sql<string | null>`tag_allocations_new.allocation`,
       })
-      .from(transactions)
-      .innerJoin(
-        tagsLinkNew,
-        eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+      .from(sql`ancestors a`)
+      .leftJoin(T, eq(sql`a.bucket_tag`, sql`t.tag`))
+      .leftJoin(tagAllocationsNew, eq(tagAllocationsNew.tag_id, sql`t.id`))
+      .groupBy(
+        sql`a.month, a.bucket_tag, t.id, t.color, tag_allocations_new.allocation`
       )
-      .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
-      .where(and(eq(transactions.user_id, user.user.id), ...filterConditions))
-      .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.id`)
-      .orderBy(
-        sql`DATE_TRUNC('month', ${transactions.date}), tags_v2.label, tags_v2.id`
-      );
-  }
-);
+      .orderBy(sql`a.month, a.bucket_tag`);
+  })();
+}
 
 const spendingByMonthForUser = cache(
   async ({ afterXMonthsAgo, excludeTags }: SpendingByMonthArgs = {}) => {
-    const user = await getUserWithToken();
-    if (user === "no-plaid-account") {
-      return null;
-    }
+    const user = await getUserWithTokenThrows();
     const filterConditions = getFilterConditions({
       excludeTags,
       afterXMonthsAgo,
@@ -152,10 +210,7 @@ export const getIncomeByMonth = cache(
   async (): Promise<{
     rows: { month: string; amount: string; tag: string }[];
   } | null> => {
-    const user = await getUserWithToken();
-    if (user === "no-plaid-account") {
-      return null;
-    }
+    const user = await getUserWithTokenThrows();
     return (await db.execute(
       sql`
     SELECT
@@ -183,10 +238,7 @@ export const getIncomeByMonth = cache(
 
 export const getNetSpendingByMonth = cache(
   async (args: { monthUTC: YyyyMm }) => {
-    const user = await getUserWithToken();
-    if (user === "no-plaid-account") {
-      return [];
-    }
+    const user = await getUserWithTokenThrows();
     const filterConditions = getFilterConditions(args);
     const incomeSubquery = db
       .select({

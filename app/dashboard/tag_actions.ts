@@ -7,15 +7,12 @@ import {
   tags_new,
   UpdateTag,
 } from "@/server/schema";
-import { getUserWithToken } from "@/server/session";
+import { getUserWithTokenThrows } from "@/server/session";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function updateTag(tag: UpdateTag) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  const user = await getUserWithTokenThrows();
   if (user.user.id !== tag.userId) {
     return;
   }
@@ -32,10 +29,7 @@ export async function updateTag(tag: UpdateTag) {
 export async function createAllocationForTag(
   upsertTag: Omit<TagAllocationUpsert, "user_id">
 ) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  const user = await getUserWithTokenThrows();
   const result = await db
     .insert(tagAllocationsNew)
     .values({
@@ -48,10 +42,7 @@ export async function createAllocationForTag(
 }
 
 export async function deleteAllocationForTag(tagId: string) {
-  const user = await getUserWithToken();
-  if (user === "no-plaid-account") {
-    return;
-  }
+  const user = await getUserWithTokenThrows();
   await db
     .delete(tagAllocationsNew)
     .where(
