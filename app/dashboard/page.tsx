@@ -33,7 +33,7 @@ import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { AddTagInput, RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
 import { Label } from "@/app/components/Label";
-import { QueryParamFilterLink } from "@/app/dashboard/QueryParamFilterLink";
+import { FilterByTagDropdown } from "@/app/dashboard/FilterByTagDropdown";
 import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
 import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
 import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
@@ -159,7 +159,7 @@ export default async function Dashboard({
       </div>
       <div className="flex flex-col max-h-full overflow-hidden gap-5">
         <FeatureBox className="overflow-auto  sm:max-h-screen flex flex-col">
-          <TransactionFilters />
+          <TransactionFilters selectedTag={filterByTag} />
           {tsMerged.map((t) => (
             <div
               key={t.transaction_id}
@@ -196,21 +196,27 @@ export default async function Dashboard({
   );
 }
 
-async function TransactionFilters() {
+async function TransactionFilters({
+  selectedTag,
+}: {
+  selectedTag?: string;
+}) {
   const user = await getUserWithTokenThrows();
   const userTags = await db.query.tags_new.findMany({
     where: eq(tags_new.userId, user.user.id),
   });
   return (
     <div className="flex flex-wrap gap-2">
-      {userTags.map((t) => (
-        <QueryParamFilterLink value={t.tag} label="tag" key={t.tag}>
-          {t.tag}
-        </QueryParamFilterLink>
-      ))}
-      <QueryParamFilterLink value="" label="tag">
-        All
-      </QueryParamFilterLink>
+      <FilterByTagDropdown
+        options={[
+          { label: "All", value: "" },
+          ...userTags
+            .slice()
+            .sort((a, b) => a.tag.localeCompare(b.tag))
+            .map((tag) => ({ label: tag.tag, value: tag.tag })),
+        ]}
+        selectedValue={selectedTag ?? ""}
+      />
     </div>
   );
 }
