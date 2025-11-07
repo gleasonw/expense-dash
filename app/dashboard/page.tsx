@@ -196,11 +196,7 @@ export default async function Dashboard({
   );
 }
 
-async function TransactionFilters({
-  selectedTag,
-}: {
-  selectedTag?: string;
-}) {
+async function TransactionFilters({ selectedTag }: { selectedTag?: string }) {
   const user = await getUserWithTokenThrows();
   const userTags = await db.query.tags_new.findMany({
     where: eq(tags_new.userId, user.user.id),
@@ -299,11 +295,13 @@ async function TagAllocation({
   if (!tagSpending.tagAllocation) {
     return (
       <div className="">
-        <div className="flex gap-2 w-full justify-between">
+        <div
+          className={`flex gap-2 w-full justify-between ${
+            tagSpending.depth === 1 ? "" : "opacity-50"
+          }`}
+        >
           <span>{lowestTagForString(tagSpending.tag)}</span>
-          <span className={tagSpending.depth === 1 ? "" : "opacity-50"}>
-            ${tagSpending.amount}
-          </span>
+          <span>${tagSpending.amount}</span>
         </div>
         <div>
           {tagSpending.depth === 1 ? (
@@ -414,9 +412,9 @@ async function RootSpendingForTag({
   }
   return (
     <TagChild>
-      <div className="flex gap-2 w-full justify-between">
+      <div className="flex gap-2 w-full justify-between opacity-50">
         <span>{baseSpend.full_tag}</span>
-        <span className="opacity-50">${baseSpend.amount}</span>
+        <span>${baseSpend.amount}</span>
       </div>
     </TagChild>
   );
