@@ -15,6 +15,7 @@ import { cache } from "react";
 type SpendingByMonthArgs = {
   afterXMonthsAgo?: number;
   excludeTags?: string[];
+  matchDepth?: number;
 };
 
 // TODO: clean this up... very closet drawer
@@ -87,16 +88,27 @@ export type SpendingRow = {
   depth: number;
 };
 
-export function spendingForMonth({
+export function monthSpending({
   monthUTC,
   excludeTags,
+  forPastXMonths,
+  atDepth,
 }: {
   monthUTC?: YyyyMm;
+  forPastXMonths?: number;
   excludeTags?: Array<string>;
+  atDepth?: number;
 }): Promise<Array<SpendingRow>> {
   return cache(async () => {
     const user = await getUserWithTokenThrows();
-    const filterConditions = getFilterConditions({ monthUTC, excludeTags });
+    if (forPastXMonths && monthUTC) {
+      throw new Error("Cannot specify both monthUTC and forPastXMonths");
+    }
+    const filterConditions = getFilterConditions({
+      monthUTC,
+      excludeTags,
+      afterXMonthsAgo: forPastXMonths,
+    });
 
     // Use one alias consistently for the tags table.
     const T = alias(tags_new, "t");
@@ -164,39 +176,59 @@ export function spendingForMonth({
       .groupBy(
         sql`a.month, a.bucket_tag, t.id, t.color, tag_allocations_new.allocation`
       )
+      .having(sql`MIN(a.depth) <= ${atDepth ?? 100}`)
       .orderBy(sql`a.month, a.bucket_tag`);
   })();
 }
 
 const spendingByMonthForUser = cache(
-  async ({ afterXMonthsAgo, excludeTags }: SpendingByMonthArgs = {}) => {
+  async ({
+    afterXMonthsAgo,
+    excludeTags,
+    matchDepth,
+  }: SpendingByMonthArgs = {}) => {
     const user = await getUserWithTokenThrows();
     const filterConditions = getFilterConditions({
       excludeTags,
       afterXMonthsAgo,
     });
     console.log({ filterConditions });
+    const spendingByMonth = db.$with("spending_by_month").as(
+      db
+        .select({
+          month: sql<string>`DATE_TRUNC('month', ${transactions.date})`.as(
+            "month"
+          ),
+          amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`.as(
+            "amount"
+          ),
+          tag: tags_new.tag,
+          tag_id: tags_new.id,
+          color: tags_new.color,
+          depth:
+            sql<number>`cardinality(regexp_split_to_array(${tags_new.tag}, '/'))`.as(
+              "depth"
+            ),
+        })
+        .from(transactions)
+        .innerJoin(
+          tagsLinkNew,
+          eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+        )
+        .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+        .where(and(eq(transactions.user_id, user.user.id), ...filterConditions))
+        .groupBy(
+          sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.id}, ${tags_new.label}`
+        )
+        .orderBy(
+          sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.label}, ${tags_new.id}`
+        )
+    );
     return await db
-      .select({
-        month: sql<string>`DATE_TRUNC('month', ${transactions.date}) as month`,
-        amount: sql<string>`SUM(CAST(${transactions.amount} AS NUMERIC))`,
-        tag: tags_new.tag,
-        tag_id: tags_new.id,
-        color: tags_new.color,
-      })
-      .from(transactions)
-      .innerJoin(
-        tagsLinkNew,
-        eq(transactions.transaction_id, tagsLinkNew.transaction_id)
-      )
-      .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
-      .where(and(eq(transactions.user_id, user.user.id), ...filterConditions))
-      .groupBy(
-        sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.id}, ${tags_new.label}`
-      )
-      .orderBy(
-        sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.label}, ${tags_new.id}`
-      );
+      .with(spendingByMonth)
+      .select()
+      .from(spendingByMonth)
+      .where(sql`depth <= ${matchDepth ?? 100}`);
   }
 );
 

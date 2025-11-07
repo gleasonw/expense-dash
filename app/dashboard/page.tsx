@@ -21,7 +21,7 @@ import {
 import { toAppTransaction } from "@/app/dashboard/transaction_utils";
 import {
   getNetSpendingByMonth,
-  spendingForMonth,
+  monthSpending,
   SpendingRow,
 } from "@/app/dashboard/aggregates";
 import { SpendingChart } from "@/app/dashboard/SpendingChart";
@@ -84,16 +84,22 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  const [tsMerged, spending, netSpendForMonth, allTags] = await Promise.all([
-    getTransactionsWithTags({ tag: filterByTag, monthUTC }),
-    spendingForMonth({
-      monthUTC,
-      //TODO: make these configurable, save view
-      excludeTags: ["income", "transfer"],
-    }),
-    getNetSpendingByMonth({ monthUTC }),
-    allUserTags(),
-  ]);
+  const [tsMerged, spending, netSpendForMonth, allTags, spendingLast5Months] =
+    await Promise.all([
+      getTransactionsWithTags({ tag: filterByTag, monthUTC }),
+      monthSpending({
+        monthUTC,
+        //TODO: make these configurable, save view
+        excludeTags: ["income", "transfer"],
+      }),
+      getNetSpendingByMonth({ monthUTC }),
+      allUserTags(),
+      monthSpending({
+        forPastXMonths: 5,
+        excludeTags: ["income", "transfer"],
+        atDepth: 1,
+      }),
+    ]);
 
   console.log({ spending });
 
@@ -153,7 +159,7 @@ export default async function Dashboard({
         <FeatureBox className="hidden sm:flex">
           {/**@ts-expect-error css modules are a pain with ts */}
           <div className={style.chart}>
-            <SpendingChart discretionaryByMonth={spending ?? []} />
+            <SpendingChart discretionaryByMonth={spendingLast5Months ?? []} />
           </div>
         </FeatureBox>
       </div>
@@ -218,7 +224,7 @@ async function TransactionFilters({ selectedTag }: { selectedTag?: string }) {
 }
 
 async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
-  const taggedSpendingByPeriod = await spendingForMonth({
+  const taggedSpendingByPeriod = await monthSpending({
     monthUTC,
     excludeTags: ["income", "transfer"],
   });
@@ -278,7 +284,7 @@ async function TagAllocation({
   children?: React.ReactNode;
   monthUTC: dateUtils.YyyyMm;
 }) {
-  const estimatedIncomeAndExpenses = await spendingForMonth({
+  const estimatedIncomeAndExpenses = await monthSpending({
     monthUTC: `${new Date().getUTCFullYear()}-${String(
       new Date().getUTCMonth()
     ).padStart(2, "0")}-01`,
