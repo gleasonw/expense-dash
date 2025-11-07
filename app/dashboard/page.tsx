@@ -95,7 +95,7 @@ export default async function Dashboard({
       getNetSpendingByMonth({ monthUTC }),
       allUserTags(),
       monthSpending({
-        forPastXMonths: 5,
+        forPastXMonths: 3,
         excludeTags: ["income", "transfer"],
         atDepth: 1,
       }),
