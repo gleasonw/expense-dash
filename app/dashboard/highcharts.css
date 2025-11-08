@@ -1230,3 +1230,26 @@ g.highcharts-series,
   fill: hsla(0, 0%, 0%, 0.3);
   stroke: hsla(0, 0%, 0%, 0.3);
 }
+
+/* zero line */
+.highcharts-plot-line.zero-line {
+  stroke: currentColor;
+  opacity: 0.35;
+}
+
+/* positive / negative zones (tailwind-friendly if you want) */
+.highcharts-point.net-pos,
+.highcharts-point-zone.net-pos {
+  fill: var(--net-pos, #16a34a);
+}
+
+.highcharts-point.net-neg,
+.highcharts-point-zone.net-neg {
+  fill: var(--net-neg, #dc2626);
+}
+
+/* data label */
+.highcharts-data-label .net-label,
+.highcharts-data-label text {
+  font-weight: 600;
+}
