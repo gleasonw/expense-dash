@@ -263,9 +263,15 @@ export const getIncomeByMonth = cache(
 );
 
 export const getNetSpendingByMonth = cache(
-  async (args: { monthUTC: YyyyMm }) => {
+  async (args?: { monthUTC?: YyyyMm; pastXMonths?: number }) => {
+    if (args?.monthUTC && args?.pastXMonths) {
+      throw new Error("Cannot specify both monthUTC and pastXMonths");
+    }
     const user = await getUserWithTokenThrows();
-    const filterConditions = getFilterConditions(args);
+    const filterConditions = getFilterConditions({
+      monthUTC: args?.monthUTC,
+      afterXMonthsAgo: args?.pastXMonths,
+    });
     const incomeSubquery = db
       .select({
         month: sql<string>`DATE_TRUNC('month', ${transactions.date})`.as(

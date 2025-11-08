@@ -40,6 +40,7 @@ import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
 import { lowestTagForString, tagsByParent } from "@/app/dashboard/tag_utils";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
+import { NetSpendChart } from "@/app/dashboard/NetSpendingChart";
 
 // TODO
 // break down transactions table into accounts (tabs probably make the most sense here)
@@ -84,24 +85,26 @@ export default async function Dashboard({
 
   await Promise.allSettled(operationsToRun);
 
-  const [tsMerged, spending, netSpendForMonth, allTags, spendingLast5Months] =
-    await Promise.all([
-      getTransactionsWithTags({ tag: filterByTag, monthUTC }),
-      monthSpending({
-        monthUTC,
-        //TODO: make these configurable, save view
-        excludeTags: ["income", "transfer"],
-      }),
-      getNetSpendingByMonth({ monthUTC }),
-      allUserTags(),
-      monthSpending({
-        forPastXMonths: 3,
-        excludeTags: ["income", "transfer"],
-        atDepth: 1,
-      }),
-    ]);
+  console.log(`beginning fetch`);
+  const [
+    tsMerged,
+    netSpendForMonth,
+    allTags,
+    spendingLast5Months,
+    testAllNetSpend,
+  ] = await Promise.all([
+    getTransactionsWithTags({ tag: filterByTag, monthUTC }),
+    getNetSpendingByMonth({ monthUTC }),
+    allUserTags(),
+    monthSpending({
+      forPastXMonths: 3,
+      excludeTags: ["income", "transfer"],
+      atDepth: 1,
+    }),
+    getNetSpendingByMonth({ pastXMonths: 3 }),
+  ]);
 
-  console.log({ spending });
+  console.log({ testAllNetSpend });
 
   const netSpendForSelectedMonth = netSpendForMonth?.at(0);
 
@@ -160,6 +163,12 @@ export default async function Dashboard({
           {/**@ts-expect-error css modules are a pain with ts */}
           <div className={style.chart}>
             <SpendingChart discretionaryByMonth={spendingLast5Months ?? []} />
+          </div>
+        </FeatureBox>
+        <FeatureBox className="hidden sm:flex">
+          {/**@ts-expect-error css modules are a pain with ts */}
+          <div className={style.chart}>
+            <NetSpendChart rows={testAllNetSpend ?? []} title="net spend" />
           </div>
         </FeatureBox>
       </div>
