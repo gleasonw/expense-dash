@@ -8,10 +8,20 @@ import { DeleteBucketButton } from "./DeleteBucketButton";
 import { updateBucket } from "../bucket_actions";
 import { MovementForm } from "./MovementForm";
 import { MarkOngoingCompleteButton } from "./MarkOngoingCompleteButton";
+import type { BucketWithMovements } from "../buckets_sdk";
+
+type Movement = {
+  id: number;
+  amount: string;
+  note: string | null;
+  transactionId: string | null;
+  occurredAt: Date;
+  isOrphaned?: boolean;
+};
 
 type BucketCardProps = {
-  bucket: any;
-  movements: any[];
+  bucket: BucketWithMovements;
+  movements: Movement[];
   savingsTarget: number;
 };
 
