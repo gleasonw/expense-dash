@@ -55,11 +55,22 @@ export default async function Savings() {
   const ongoingBuckets = activeBuckets.filter((b) => b.type === "ongoing");
 
   // Map movements to buckets with orphaned status
+  type MovementWithOrphaned = {
+    id: number;
+    bucketId: number;
+    amount: string;
+    note: string | null;
+    transactionId: string | null;
+    occurredAt: Date;
+    createdAt: Date;
+    isOrphaned: boolean;
+  };
+
   const bucketMovementsMap = movementsWithOrphaned.reduce((acc, movement) => {
     if (!acc[movement.bucketId]) acc[movement.bucketId] = [];
     acc[movement.bucketId]!.push(movement);
     return acc;
-  }, {} as Record<number, any[]>);
+  }, {} as Record<number, MovementWithOrphaned[]>);
 
   return (
     <div className="p-6 max-w-7xl w-full mx-auto">
