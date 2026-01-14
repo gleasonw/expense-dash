@@ -18,6 +18,10 @@ export function MonthPicker({
   const { end } = dateUtils.monthRangeUTC(month);
   console.log(end);
 
+  // Prevent navigation to future months
+  const now = new Date();
+  const currentMonth = new Date(now.getUTCFullYear(), now.getUTCMonth(), 1);
+
   return (
     <Calendar
       mode="single"
@@ -33,7 +37,7 @@ export function MonthPicker({
       }}
       captionLayout="dropdown" // shows month/year dropdown
       startMonth={new Date(2000, 0)}
-      endMonth={new Date(2030, 0)}
+      endMonth={currentMonth}
       showOutsideDays={false}
       fixedWeeks={false}
       // hide actual grid

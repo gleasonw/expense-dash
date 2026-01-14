@@ -1,7 +1,7 @@
 import * as dateUtils from "@/app/utils/dates";
 import { db } from "@/server/db";
 import { tags_new, tagsLinkNew, transactions } from "@/server/schema";
-import { and, eq, gte, inArray, lt, notExists, sql } from "drizzle-orm";
+import { and, eq, exists, gte, inArray, lt, notExists, sql } from "drizzle-orm";
 
 /** filters expected to apply directly onto the transactions table */
 export function getFilterConditions(
@@ -9,6 +9,7 @@ export function getFilterConditions(
     | {
         monthUTC?: dateUtils.YyyyMm;
         excludeTags?: string[];
+        includeTag?: string;
         afterXMonthsAgo?: number;
       }
     | undefined
@@ -19,6 +20,25 @@ export function getFilterConditions(
     console.log("filtering for month", filters.monthUTC, start, end);
     filterConditions.push(gte(transactions.date, start.toISOString()));
     filterConditions.push(lt(transactions.date, end.toISOString()));
+  }
+  if (filters?.includeTag) {
+    // Positive filtering: only include transactions with this tag (or subtags)
+    filterConditions.push(
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(tagsLinkNew)
+          .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+          .where(
+            and(
+              eq(tagsLinkNew.transaction_id, transactions.transaction_id),
+              sql`${tags_new.tag} = ${filters.includeTag} OR ${
+                tags_new.tag
+              } LIKE ${filters.includeTag + "/"} || '%'`
+            )
+          )
+      )
+    );
   }
   if (filters?.excludeTags && filters.excludeTags.length > 0) {
     filterConditions.push(
