@@ -28,7 +28,7 @@ export function AggregateView({
   selectedTag?: string;
 }) {
   return (
-    <div className="px-2 flex flex-col gap-5 max-h-full overflow-hidden">
+    <div className="px-2 flex flex-col gap-5 max-h-full overflow-hidden w-full">
       {/* Controls Row */}
       <div className="flex gap-4 w-full flex-wrap items-end bg-white p-4 rounded shadow-md">
         <div className="flex gap-4">
