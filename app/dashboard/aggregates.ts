@@ -91,12 +91,14 @@ export type SpendingRow = {
 export function monthSpending({
   monthUTC,
   excludeTags,
+  includeTag,
   forPastXMonths,
   atDepth,
 }: {
   monthUTC?: YyyyMm;
   forPastXMonths?: number;
   excludeTags?: Array<string>;
+  includeTag?: string;
   atDepth?: number;
 }): Promise<Array<SpendingRow>> {
   return cache(async () => {
@@ -107,6 +109,7 @@ export function monthSpending({
     const filterConditions = getFilterConditions({
       monthUTC,
       excludeTags,
+      includeTag,
       afterXMonthsAgo: forPastXMonths,
     });
 
@@ -263,13 +266,18 @@ export const getIncomeByMonth = cache(
 );
 
 export const getNetSpendingByMonth = cache(
-  async (args?: { monthUTC?: YyyyMm; pastXMonths?: number }) => {
+  async (args?: {
+    monthUTC?: YyyyMm;
+    pastXMonths?: number;
+    includeTag?: string;
+  }) => {
     if (args?.monthUTC && args?.pastXMonths) {
       throw new Error("Cannot specify both monthUTC and pastXMonths");
     }
     const user = await getUserWithTokenThrows();
     const filterConditions = getFilterConditions({
       monthUTC: args?.monthUTC,
+      includeTag: args?.includeTag,
       afterXMonthsAgo: args?.pastXMonths,
     });
     const incomeSubquery = db
