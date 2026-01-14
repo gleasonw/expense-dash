@@ -3,12 +3,23 @@
 import { db } from "@/server/db";
 import {
   auto_tag_merchants_new,
+  bucketMovements,
   tags_new,
   tagsLinkNew,
   transactions,
 } from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
-import { and, inArray, eq, or, notInArray, desc } from "drizzle-orm";
+import {
+  and,
+  inArray,
+  eq,
+  or,
+  notInArray,
+  desc,
+  sql,
+  gte,
+  lt,
+} from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cache } from "react";
 import * as R from "remeda";
@@ -187,3 +198,60 @@ export const getTransactionsWithTags = cache(
     });
   }
 );
+
+export async function getSavingsTransactionsWithAllocations(month: string) {
+  const user = await getUserWithTokenThrows();
+
+  // month should be in format "YYYY-MM"
+  const startOfMonth = month + "-01";
+  const nextMonth = new Date(month + "-01");
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+  const endOfMonth = nextMonth.toISOString().slice(0, 10);
+
+  // Get all savings transactions for the month with their allocated amounts
+  const results = await db
+    .select({
+      transactionId: transactions.transaction_id,
+      transactionName: transactions.name,
+      merchantName: transactions.merchant_name,
+      transactionDate: transactions.date,
+      transactionAmount: transactions.amount,
+      allocatedAmount: sql<string>`COALESCE(SUM(CAST(${bucketMovements.amount} AS NUMERIC)), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(
+      tagsLinkNew,
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+    )
+    .innerJoin(
+      tags_new,
+      and(eq(tagsLinkNew.tag_id, tags_new.id), eq(tags_new.tag, "savings"))
+    )
+    .leftJoin(
+      bucketMovements,
+      eq(transactions.transaction_id, bucketMovements.transactionId)
+    )
+    .where(
+      and(
+        eq(transactions.user_id, user.user.id),
+        gte(transactions.date, startOfMonth),
+        lt(transactions.date, endOfMonth)
+      )
+    )
+    .groupBy(
+      transactions.transaction_id,
+      transactions.name,
+      transactions.merchant_name,
+      transactions.date,
+      transactions.amount
+    )
+    .orderBy(desc(transactions.date));
+
+  return results.map((r) => ({
+    ...r,
+    // Calculate unallocated (transaction amounts are negative for savings/income)
+    unallocatedAmount: (
+      Math.abs(parseFloat(r.transactionAmount)) - parseFloat(r.allocatedAmount)
+    ).toFixed(2),
+  }));
+}

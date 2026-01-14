@@ -1,202 +1,134 @@
+import { getMonthTargetForTag } from "@/app/dashboard/aggregates";
 import {
-  getMonthTargetForTag,
-  getSpendingByMonth,
-} from "@/app/dashboard/aggregates";
-import {
-  BucketWithMovements,
   getBuckets,
-  remainingSavingsAfterOngoing,
-  totalGoalBuckets,
+  getMovementsWithOrphanedStatus,
 } from "@/app/dashboard/buckets_sdk";
-import { BucketForm } from "@/app/dashboard/savings/BucketForm";
-import { DeleteBucketButton } from "@/app/dashboard/savings/DeleteBucketButton";
-import { MarkOngoingCompleteButton } from "@/app/dashboard/savings/MarkOngoingCompleteButton";
-import { MovementForm } from "@/app/dashboard/savings/MovementForm";
-import { RemoveMovementsFromBucketButton } from "@/app/dashboard/savings/RemoveMovementsFromBucketButton";
-import { db } from "@/server/db";
+import { getSavingsTransactionsWithAllocations } from "../transactions_sdk";
 import { getUserWithTokenThrows } from "@/server/session";
-import { sql } from "drizzle-orm";
-
-// TODO: completion status for buckets...
-// - [ ] ongoing
-// - [ ] goal
-
-// TODO: [ ] let user create movement for ongoing bucket that
-// reflects percentage of savings target
+import { MonthBudgetOverview } from "./MonthBudgetOverview";
+import { UnallocatedTransactionsSection } from "./UnallocatedTransactionsSection";
+import { AutoAllocationSuggestions } from "./AutoAllocationSuggestions";
+import { BucketForm } from "./BucketForm";
+import { BucketCard } from "./BucketCard";
 
 export default async function Savings() {
   await getUserWithTokenThrows();
-  const rows = await getSpendingByMonth({ afterXMonthsAgo: 1 });
-  const buckets = await getBuckets();
 
-  //TODO: hardcoded savings tag? should probably just be a default we add
-  // when the user registers
-  const currentMonthSavings = rows?.find(
-    (row) =>
-      row.month === new Date().toISOString().slice(0, 7) &&
-      row.tag === "savings"
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  // Fetch all data in parallel
+  const [buckets, savingsTarget, savingsTransactions, movementsWithOrphaned] =
+    await Promise.all([
+      getBuckets(),
+      getMonthTargetForTag("savings"),
+      getSavingsTransactionsWithAllocations(currentMonth),
+      getMovementsWithOrphanedStatus(),
+    ]);
+
+  // Calculate budget overview data
+  const totalSavingsBudget = savingsTransactions.reduce(
+    (sum, t) => sum + Math.abs(parseFloat(t.transactionAmount)),
+    0
   );
 
-  const savingsTarget = await getMonthTargetForTag("savings");
-  console.log({ savingsTarget });
+  const totalAllocated = savingsTransactions.reduce(
+    (sum, t) => sum + parseFloat(t.allocatedAmount),
+    0
+  );
+
+  const orphanedCount = movementsWithOrphaned.filter(
+    (m) => m.isOrphaned
+  ).length;
+
+  const budgetData = {
+    totalBudget: totalSavingsBudget,
+    allocated: totalAllocated,
+    remaining: totalSavingsBudget - totalAllocated,
+    orphanedCount,
+  };
+
+  // Filter non-archived buckets
+  const activeBuckets = buckets.filter((b) => !b.isArchived);
+
+  // Group buckets by type
+  const goalBuckets = activeBuckets.filter((b) => b.type === "goal");
+  const ongoingBuckets = activeBuckets.filter((b) => b.type === "ongoing");
+
+  // Map movements to buckets with orphaned status
+  const bucketMovementsMap = movementsWithOrphaned.reduce((acc, movement) => {
+    if (!acc[movement.bucketId]) acc[movement.bucketId] = [];
+    acc[movement.bucketId]!.push(movement);
+    return acc;
+  }, {} as Record<number, any[]>);
+
   return (
-    <div className="p-3 flex flex-col gap-5 max-w-5xl mx-auto">
-      <BucketForm />
-      <div className="shadow-md p-5 border">
-        <h1>
-          {new Intl.DateTimeFormat("en-US", { month: "long" }).format(
-            new Date()
-          )}{" "}
-          savings overview
+    <div className="p-6 max-w-7xl w-full mx-auto">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Savings Dashboard
         </h1>
-        <div className="flex flex-wrap gap-5">
-          <div>
-            <h2>current month savings</h2>${currentMonthSavings?.amount}
-          </div>
-          <div>
-            <h2>target from est income</h2>$
-            {Math.round(savingsTarget?.target || 0)}
-          </div>
-          <div>
-            <h2>diff to transfer</h2>
-            {savingsTarget && currentMonthSavings
-              ? `$${Math.round(
-                  savingsTarget.target -
-                    (parseInt(currentMonthSavings?.amount) ?? 0)
-                )}`
-              : 0}
-          </div>
-        </div>
+        <p className="text-gray-600">
+          Track your savings goals and allocate your monthly savings
+        </p>
       </div>
-      <SavingsWarnings />
 
-      <div className="flex flex-wrap gap-5">
-        {buckets.map((bucket) =>
-          bucket.type === "goal" ? (
-            <GoalBucket key={bucket.id} bucket={bucket} />
-          ) : (
-            <OngoingBucket key={bucket.id} bucket={bucket} />
-          )
+      <MonthBudgetOverview data={budgetData} month={currentMonth} />
+
+      <UnallocatedTransactionsSection
+        transactions={savingsTransactions}
+        buckets={activeBuckets}
+      />
+
+      <AutoAllocationSuggestions
+        currentMonth={currentMonth}
+        hasOngoingBuckets={ongoingBuckets.length > 0}
+      />
+
+      <div className="mb-6">
+        <BucketForm />
+      </div>
+
+      <div className="space-y-8">
+        {goalBuckets.length > 0 && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Goal Buckets</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {goalBuckets.map((bucket) => (
+                <BucketCard
+                  key={bucket.id}
+                  bucket={bucket}
+                  movements={bucketMovementsMap[bucket.id] || []}
+                  savingsTarget={savingsTarget?.target ?? 0}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {ongoingBuckets.length > 0 && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Ongoing Buckets</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {ongoingBuckets.map((bucket) => (
+                <BucketCard
+                  key={bucket.id}
+                  bucket={bucket}
+                  movements={bucketMovementsMap[bucket.id] || []}
+                  savingsTarget={savingsTarget?.target ?? 0}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeBuckets.length === 0 && (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <p className="text-gray-600 mb-4">
+              No buckets yet. Create your first savings bucket above!
+            </p>
+          </div>
         )}
       </div>
-    </div>
-  );
-}
-
-async function SavingsWarnings() {
-  const warnings = [];
-  const user = await getUserWithTokenThrows();
-
-  // TODO: parallelize
-  const savingsTarget = await getMonthTargetForTag("savings");
-  const remaining = await remainingSavingsAfterOngoing();
-  // for simplicity, let's assume that createdAt reflects the month the
-  // movement is expected to occur
-  const totalMovements = await db.execute(
-    sql`
-    SELECT SUM(CAST(amount as NUMERIC)) as total
-    FROM bucket_movements
-    WHERE user_id = ${user.user.id}
-      AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
-      AND created_at < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-    `
-  );
-
-  if (remaining === "greater_than_100_allocated") {
-    warnings.push(
-      <div key="greater-than-100" className="text-red-500">
-        You have allocated more than 100% of your savings target to ongoing
-        buckets.
-      </div>
-    );
-  }
-
-  const totalMovementsAmount = (totalMovements.rows[0]?.total as number) || 0;
-  if (savingsTarget?.target && totalMovementsAmount > savingsTarget.target) {
-    warnings.push(
-      <div key="movements-exceed-target" className="text-red-500">
-        {`Your declared movements ($${Math.round(
-          totalMovementsAmount
-        )}) exceed your savings target ($${Math.round(savingsTarget.target)}).`}
-      </div>
-    );
-  }
-
-  if (warnings.length === 0) {
-    return null;
-  }
-
-  return <div className="flex flex-col gap-2">{warnings}</div>;
-}
-
-async function GoalBucket({ bucket }: { bucket: BucketWithMovements }) {
-  const totalAllocated = Math.round(
-    bucket.movements.reduce(
-      (acc, movement) => acc + (parseInt(movement.amount) || 0),
-      0
-    )
-  );
-  const remainingSavings = await remainingSavingsAfterOngoing();
-  const count = await totalGoalBuckets();
-  const completed =
-    totalAllocated >= (parseInt(bucket.targetAmount ?? "0") || 0);
-  return (
-    <div
-      className={`p-3 border rounded relative ${
-        completed ? "bg-green-100" : null
-      }`}
-    >
-      <h2>{bucket.name}</h2>
-      <div>
-        {totalAllocated} / {bucket.targetAmount}
-      </div>
-      <div>
-        {remainingSavings === "greater_than_100_allocated" ? (
-          <div>No savings left to allocate</div>
-        ) : (
-          <div> Month Suggested: ${Math.round(remainingSavings / count)}</div>
-        )}
-      </div>
-      <MovementForm bucketId={bucket.id} />
-      <RemoveMovementsFromBucketButton bucketId={bucket.id} />
-      <DeleteBucketButton bucketId={bucket.id} />
-    </div>
-  );
-}
-
-async function OngoingBucket({ bucket }: { bucket: BucketWithMovements }) {
-  const savingsTarget = await getMonthTargetForTag("savings");
-  const expectedMonthly = Math.round(
-    (savingsTarget?.target ?? 0) * parseFloat(bucket.targetPercentage ?? "0")
-  );
-  const sumMovements = Math.round(
-    bucket.movements.reduce(
-      (acc, movement) => acc + (parseInt(movement.amount) || 0),
-      0
-    )
-  );
-  const completed = sumMovements === expectedMonthly;
-
-  return (
-    <div
-      className={`p-3 border rounded relative ${
-        completed ? "bg-green-100" : null
-      }`}
-    >
-      <h2>{bucket.name}</h2>
-      {bucket.targetPercentage && (
-        <p>{parseFloat(bucket.targetPercentage) * 100}%</p>
-      )}
-      <div>Expected monthly: ${expectedMonthly}</div>
-      {completed ? (
-        <RemoveMovementsFromBucketButton bucketId={bucket.id} />
-      ) : (
-        <MarkOngoingCompleteButton
-          bucketId={bucket.id}
-          amount={expectedMonthly.toString()}
-        />
-      )}
-      <DeleteBucketButton bucketId={bucket.id} />
     </div>
   );
 }

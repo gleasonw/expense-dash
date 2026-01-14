@@ -1,0 +1,135 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { deleteMovement } from "../bucket_actions";
+
+type Movement = {
+  id: number;
+  amount: string;
+  note: string | null;
+  transactionId: string | null;
+  occurredAt: Date;
+  isOrphaned?: boolean;
+};
+
+export function MovementHistoryList({
+  movements,
+  onMovementDeleted,
+}: {
+  movements: Movement[];
+  onMovementDeleted: () => void;
+}) {
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleDelete = async (movementId: number) => {
+    if (!confirm("Delete this movement?")) return;
+
+    setDeletingId(movementId);
+    try {
+      await deleteMovement(movementId);
+      onMovementDeleted();
+    } catch (err) {
+      console.error("Failed to delete movement", err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (movements.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 italic py-2">No movements yet</p>
+    );
+  }
+
+  // Group by month
+  const groupedByMonth = movements.reduce((acc, movement) => {
+    const month = new Date(movement.occurredAt).toISOString().slice(0, 7);
+    if (!acc[month]) acc[month] = [];
+    acc[month].push(movement);
+    return acc;
+  }, {} as Record<string, Movement[]>);
+
+  const sortedMonths = Object.keys(groupedByMonth).sort().reverse();
+
+  return (
+    <div className="space-y-4">
+      {sortedMonths.map((month) => {
+        const monthMovements = groupedByMonth[month] || [];
+        const monthTotal = monthMovements.reduce(
+          (sum, m) => sum + parseFloat(m.amount),
+          0
+        );
+
+        return (
+          <div key={month} className="border-l-2 border-gray-200 pl-3">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-medium text-sm text-gray-700">
+                {new Date(month + "-01").toLocaleDateString("en-US", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </h4>
+              <span className="text-sm font-semibold text-gray-900">
+                ${monthTotal.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {monthMovements.map((movement) => (
+                <div
+                  key={movement.id}
+                  className="flex items-start justify-between py-2 px-3 bg-gray-50 rounded-md text-sm"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600">
+                        {new Date(movement.occurredAt).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                          }
+                        )}
+                      </span>
+                      {movement.transactionId && (
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                          Transaction
+                        </span>
+                      )}
+                      {movement.isOrphaned && (
+                        <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">
+                          Orphaned
+                        </span>
+                      )}
+                    </div>
+                    {movement.note && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {movement.note}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-gray-900">
+                      ${parseFloat(movement.amount).toFixed(2)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(movement.id)}
+                      disabled={deletingId === movement.id}
+                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {deletingId === movement.id ? "..." : "✕"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
