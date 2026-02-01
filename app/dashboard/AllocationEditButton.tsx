@@ -11,10 +11,11 @@ export function AllocationEditButton() {
 
   return (
     <Button
-      variant="outline"
+      variant={isEditingAllocation ? "default" : "outline"}
       onClick={() => setIsEditingAllocation(!isEditingAllocation)}
+      className={isEditingAllocation ? "bg-blue-600 hover:bg-blue-700" : ""}
     >
-      {isEditingAllocation ? "Done" : "Edit"}
+      {isEditingAllocation ? "Done Editing" : "Edit Allocations"}
     </Button>
   );
 }

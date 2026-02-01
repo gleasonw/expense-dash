@@ -24,15 +24,16 @@ export function CreateAllocationForm({
       <Button
         variant="default"
         onClick={() => setShow(true)}
-        className="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 max-w-sm"
+        className="bg-blue-600 text-white rounded px-6 py-2 hover:bg-blue-700 max-w-sm flex items-center gap-2"
       >
-        +
+        <span className="text-xl">+</span>
+        <span>New Budget Allocation</span>
       </Button>
     );
   }
 
   return (
-    <div className="border">
+    <div className="">
       <Button
         variant="ghost"
         onClick={() => setShow(false)}
