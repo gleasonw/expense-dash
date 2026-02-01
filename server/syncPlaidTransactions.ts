@@ -12,7 +12,7 @@ export async function syncUsersPlaidTransactions() {
       plaidAccounts: true,
     },
   });
-  Promise.all(
+  await Promise.all(
     users.map(async (u) => {
       // Sync Plaid transactions
       console.log(`syncing user ${u.name}`);
@@ -30,8 +30,8 @@ export async function syncUsersPlaidTransactions() {
           cursor: u.nextTransactionCursor ?? undefined,
         });
       } catch (e) {
-        console.error("Error fetching transactions", e);
-        return "check server";
+        console.error("Error fetching transactions for user", u.name, e);
+        return;
       }
 
       const newTransactions = toAppTransaction(latestTransactions.data.added);
@@ -45,9 +45,17 @@ export async function syncUsersPlaidTransactions() {
         autoTagTransactions(newTransactions),
       ];
 
-      await Promise.allSettled(operationsToRun);
+      const results = await Promise.allSettled(operationsToRun);
+
+      // Check for failed operations
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        console.error(`Failed operations for user ${u.name}:`, failures);
+        return;
+      }
+
       console.log(
-        `sync succesful, pulled ${latestTransactions.data.added.length} new transactions`
+        `sync successful, pulled ${latestTransactions.data.added.length} new transactions`
       );
     })
   );
