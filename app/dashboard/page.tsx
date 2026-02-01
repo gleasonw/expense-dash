@@ -97,6 +97,7 @@ export default async function Dashboard({
       (endDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12 +
       (endDate.getUTCMonth() - startDate.getUTCMonth());
 
+    // Fetch subtag data when a tag filter is active for drill-down view
     const [spendingData, netSpendingData] = await Promise.all([
       monthSpending({
         forPastXMonths: monthsDiff,
@@ -110,6 +111,16 @@ export default async function Dashboard({
       }),
     ]);
 
+    // If a tag is selected, also fetch its subtags at depth 2
+    const subtagData = filterByTag
+      ? await monthSpending({
+          forPastXMonths: monthsDiff,
+          excludeTags: ["income", "transfer"],
+          includeTag: filterByTag,
+          atDepth: 2,
+        })
+      : undefined;
+
     return (
       <div className="flex flex-col gap-4 p-4 items-center">
         <ViewToggle defaultView="month" />
@@ -118,6 +129,7 @@ export default async function Dashboard({
           netSpendingData={netSpendingData}
           allTags={allTags}
           selectedTag={filterByTag}
+          subtagData={subtagData}
         />
       </div>
     );
