@@ -75,7 +75,7 @@ export function BucketCard({
 
   return (
     <div
-      className={`p-5 rounded-lg border-2 shadow-sm ${
+      className={`p-5 rounded-lg border-2 shadow-sm relative ${
         isCompleted
           ? "bg-green-50 border-green-300"
           : "bg-white border-gray-200"

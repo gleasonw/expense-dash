@@ -174,33 +174,34 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
   return (
     <div className="flex flex-col gap-5 w-full">
       <AllocationEditContext>
-        {hierarchyForm.map((tagSpending) => {
-          if (!tagSpending) {
-            return <div key={tagSpending}>No allocation for {tagSpending}</div>;
-          }
-          return (
-            <TagAllocation
-              monthUTC={monthUTC}
-              key={tagSpending.parent.tag}
-              tagSpending={tagSpending.parent}
-            >
-              {tagSpending.children.map((childTagSpending) => (
-                <TagChild key={childTagSpending.tag_id}>
-                  <TagAllocation
-                    monthUTC={monthUTC}
-                    tagSpending={childTagSpending}
-                  />
-                </TagChild>
-              ))}
-            </TagAllocation>
-          );
-        })}
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <CreateAllocationForm tags={tags} />
-
-          <div className="ml-auto">
-            <AllocationEditButton />
-          </div>
+          <AllocationEditButton />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {hierarchyForm.map((tagSpending) => {
+            if (!tagSpending) {
+              return (
+                <div key={tagSpending}>No allocation for {tagSpending}</div>
+              );
+            }
+            return (
+              <TagAllocation
+                monthUTC={monthUTC}
+                key={tagSpending.parent.tag}
+                tagSpending={tagSpending.parent}
+              >
+                {tagSpending.children.map((childTagSpending) => (
+                  <TagChild key={childTagSpending.tag_id}>
+                    <TagAllocation
+                      monthUTC={monthUTC}
+                      tagSpending={childTagSpending}
+                    />
+                  </TagChild>
+                ))}
+              </TagAllocation>
+            );
+          })}
         </div>
       </AllocationEditContext>
     </div>
@@ -239,7 +240,9 @@ async function TagAllocation({
       <div className="">
         <div
           className={`flex gap-2 w-full justify-between ${
-            tagSpending.depth === 1 ? "" : "opacity-50"
+            tagSpending.depth === 1
+              ? "font-semibold text-base"
+              : "text-sm text-gray-600 py-0.5"
           }`}
         >
           <span>{lowestTagForString(tagSpending.tag)}</span>
@@ -261,13 +264,18 @@ async function TagAllocation({
   const allocation = parseInt(tagSpending?.tagAllocation ?? "0", 10);
   const targetSpending = (allocation / 100) * estIncome;
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col border border-gray-200 rounded-lg p-4 bg-white shadow-md">
+      {/* Top-level budget header */}
       <div key={tagSpending.tag_id} className="w-full flex">
-        <div className="flex-col gap-2 w-full flex">
-          <div className="flex gap-2 justify-between text-sm">
-            <div>{tagSpending.tag}</div>
-            <div>
-              ${tagSpending.amount} / ${Math.round(targetSpending)}
+        <div className="flex-col gap-3 w-full flex">
+          <div className="flex gap-2 justify-between items-baseline">
+            <div className="text-lg font-semibold">{tagSpending.tag}</div>
+            <div className="text-base">
+              <span className="font-bold">${tagSpending.amount}</span>
+              <span className="text-gray-500"> / </span>
+              <span className="text-gray-700">
+                ${Math.round(targetSpending)}
+              </span>
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -309,7 +317,13 @@ async function TagAllocation({
       {tagSpending.depth === 1 ? (
         <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
       ) : null}
-      {children}
+
+      {/* Breakdown section */}
+      {children && (
+        <div className="mt-4 pt-3 border-t border-gray-300">
+          <div className="space-y-1">{children}</div>
+        </div>
+      )}
     </div>
   );
 }
