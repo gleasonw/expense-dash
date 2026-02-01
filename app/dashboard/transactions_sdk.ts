@@ -7,6 +7,7 @@ import {
   tags_new,
   tagsLinkNew,
   transactions,
+  User,
 } from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
 import {
@@ -96,15 +97,14 @@ export async function tryAutoTagTransactions() {
   }
 }
 
-export async function autoTagTransactions(
+export async function autoTagTransactionsForUser(
   ts: {
     name: string;
     merchant_name?: string | null | undefined;
     transaction_id: string;
-  }[]
+  }[],
+  user: User
 ) {
-  console.log(`attemping auto tag`, ts.length);
-  const userWithAccount = await getUserWithTokenThrows();
   console.log(
     "here are some names",
     ts.map((t) => t.name)
@@ -128,7 +128,7 @@ export async function autoTagTransactions(
             ts.map((t) => t.merchant_name ?? "")
           )
         ),
-        eq(auto_tag_merchants_new.user_id, userWithAccount.user.id)
+        eq(auto_tag_merchants_new.user_id, user.id)
       )
     );
 
@@ -145,9 +145,13 @@ export async function autoTagTransactions(
     if (!autoTag) {
       return acc;
     }
-    acc.push({ transaction_id: t.transaction_id, tag_id: autoTag.tag_id });
+    acc.push({
+      transaction_id: t.transaction_id,
+      tag_id: autoTag.tag_id,
+      tagName: autoTag.name,
+    });
     return acc;
-  }, [] as { transaction_id: string; tag_id: string }[]);
+  }, [] as { transaction_id: string; tag_id: string; tagName: string }[]);
 
   if (transactionsToAutotag.length === 0) {
     console.log("no transactions to auto tag");
@@ -164,6 +168,24 @@ export async function autoTagTransactions(
     .returning();
   revalidatePath("/dashboard");
   console.log({ autoTagged });
+  return {
+    //todo: wonky
+    autoTagged: transactionsToAutotag.filter((t) =>
+      autoTagged.some((at) => at.transaction_id === t.transaction_id)
+    ),
+  };
+}
+
+export async function autoTagTransactions(
+  ts: {
+    name: string;
+    merchant_name?: string | null | undefined;
+    transaction_id: string;
+  }[]
+) {
+  console.log(`attemping auto tag`, ts.length);
+  const userWithAccount = await getUserWithTokenThrows();
+  return autoTagTransactionsForUser(ts, userWithAccount.user);
 }
 
 export const getTransactionsWithTags = cache(
