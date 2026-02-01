@@ -1,14 +1,4 @@
-import { addTransactions } from "@/app/dashboard/actions";
-import { plaidClient } from "@/server/plaid";
-import { db } from "@/server/db";
-import { userTable } from "@/server/schema";
-import { getUserWithTokenThrows } from "@/server/session";
-import { eq } from "drizzle-orm";
-import {
-  autoTagTransactions,
-  getTransactionsWithTags,
-} from "@/app/dashboard/transactions_sdk";
-import { toAppTransaction } from "@/app/dashboard/transaction_utils";
+import { getTransactionsWithTags } from "@/app/dashboard/transactions_sdk";
 import {
   getNetSpendingByMonth,
   monthSpending,
@@ -28,36 +18,9 @@ export default async function Dashboard({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const userWithAccount = await getUserWithTokenThrows();
   const params = await searchParams;
   const view = (params.view as string) ?? "month";
   const filterByTag = params.tag as string | undefined;
-
-  // Sync Plaid transactions
-  let latestTransactions;
-  try {
-    latestTransactions = await plaidClient.transactionsSync({
-      access_token: userWithAccount.plaidAccount.access_token,
-      count: 500,
-      cursor: userWithAccount.user.nextTransactionCursor ?? undefined,
-    });
-  } catch (e) {
-    console.error("Error fetching transactions", e);
-    return "check server";
-  }
-
-  const newTransactions = toAppTransaction(latestTransactions.data.added);
-
-  const operationsToRun = [
-    db
-      .update(userTable)
-      .set({ nextTransactionCursor: latestTransactions.data.next_cursor })
-      .where(eq(userTable.id, userWithAccount.user.id)),
-    addTransactions(newTransactions),
-    autoTagTransactions(newTransactions),
-  ];
-
-  await Promise.allSettled(operationsToRun);
 
   // Fetch tags (needed for both views)
   const allTags = await allUserTags();
@@ -139,7 +102,6 @@ export default async function Dashboard({
   const mParam = params.monthUTC;
   const mParamString = typeof mParam === "string" ? mParam : undefined;
   const monthUTC = dateUtils.normYyyyMm(mParamString);
-  console.log({ monthUTC });
 
   const [tsMerged, netSpendForMonth, spendingLast5Months, testAllNetSpend] =
     await Promise.all([
