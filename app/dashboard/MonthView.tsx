@@ -16,7 +16,6 @@ import { TransactionDateEditor } from "@/app/dashboard/SpendingTable";
 import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { AddTagInput, RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
-import { Label } from "@/app/components/Label";
 import { FilterByTagDropdown } from "@/app/dashboard/FilterByTagDropdown";
 import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
 import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
@@ -53,35 +52,53 @@ export async function MonthView({
 }) {
   return (
     <div className="px-2 flex flex-col justify-center w-full items-center max-w-[1000px] gap-5">
-      <FeatureBox className="flex gap-2 w-full">
-        <MonthPicker monthUTC={monthUTC} />
-        <div className="flex p-1 gap-5">
-          <Label text={"Income"}>
-            ${netSpendForSelectedMonth?.total_income}
-          </Label>
-          <Label text={"Spending"}>
-            ${netSpendForSelectedMonth?.total_spending}
-          </Label>
-          <Label
-            className={`flex flex-col text-lg ${
+      <div className="flex flex-col lg:flex-row gap-4 w-full items-stretch">
+        <FeatureBox className="flex items-center justify-center">
+          <MonthPicker monthUTC={monthUTC} />
+        </FeatureBox>
+
+        <div className="grid grid-cols-3 gap-4 flex-1">
+          {/* Income Card */}
+          <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
+            <span className="text-sm font-medium text-gray-500 mb-1">
+              Income
+            </span>
+            <span className="text-2xl font-bold text-gray-900">
+              ${netSpendForSelectedMonth?.total_income}
+            </span>
+          </div>
+
+          {/* Spending Card */}
+          <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
+            <span className="text-sm font-medium text-gray-500 mb-1">
+              Spending
+            </span>
+            <span className="text-2xl font-bold text-gray-900">
+              ${netSpendForSelectedMonth?.total_spending}
+            </span>
+          </div>
+
+          {/* Net Card */}
+          <div
+            className={`rounded-lg shadow-sm p-4 flex flex-col ${
               Number(netSpendForSelectedMonth?.net_amount) < 0
-                ? "text-red-700"
-                : "text-green-700"
+                ? "bg-red-50 border border-red-200"
+                : "bg-green-50 border border-green-200"
             }`}
-            text={"Net"}
           >
+            <span className="text-sm font-medium text-gray-600 mb-1">Net</span>
             <span
-              className={`p-3 ${
-                Number(netSpendForSelectedMonth?.net_amount) > 0
-                  ? "bg-green-200"
-                  : "bg-red-200"
+              className={`text-2xl font-bold ${
+                Number(netSpendForSelectedMonth?.net_amount) < 0
+                  ? "text-red-700"
+                  : "text-green-700"
               }`}
             >
               ${netSpendForSelectedMonth?.net_amount}
             </span>
-          </Label>
+          </div>
         </div>
-      </FeatureBox>
+      </div>
       <FeatureBox
         className={clsx("w-full col-span-2 ", {
           hidden: tsMerged.filter((t) => t.tags.length === 0).length === 0,
