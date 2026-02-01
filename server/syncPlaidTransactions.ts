@@ -1,9 +1,8 @@
-import { addTransactions } from "@/app/dashboard/actions";
 import { toAppTransaction } from "@/app/dashboard/transaction_utils";
-import { autoTagTransactions } from "@/app/dashboard/transactions_sdk";
+import { autoTagTransactionsForUser } from "@/app/dashboard/transactions_sdk";
 import { db } from "@/server/db";
 import { plaidClient } from "@/server/plaid";
-import { userTable } from "@/server/schema";
+import { transactions, userTable } from "@/server/schema";
 import { eq } from "drizzle-orm";
 
 export async function syncUsersPlaidTransactions() {
@@ -36,14 +35,31 @@ export async function syncUsersPlaidTransactions() {
 
       const newTransactions = toAppTransaction(latestTransactions.data.added);
 
-      const operationsToRun = [
+      const operationsToRun = [];
+      operationsToRun.push(
         db
           .update(userTable)
           .set({ nextTransactionCursor: latestTransactions.data.next_cursor })
-          .where(eq(userTable.id, u.id)),
-        addTransactions(newTransactions),
-        autoTagTransactions(newTransactions),
-      ];
+          .where(eq(userTable.id, u.id))
+      );
+
+      if (newTransactions.length > 0) {
+        operationsToRun.push(
+          db
+            .insert(transactions)
+            .values(
+              newTransactions.map((t) => ({
+                ...t,
+                user_id: u.id,
+                authorized_datetime: t.authorized_datetime
+                  ? new Date(t.authorized_datetime)
+                  : null,
+                datetime: t.datetime ? new Date(t.datetime) : null,
+              }))
+            )
+            .onConflictDoNothing()
+        );
+      }
 
       const results = await Promise.allSettled(operationsToRun);
 
@@ -52,6 +68,21 @@ export async function syncUsersPlaidTransactions() {
       if (failures.length > 0) {
         console.error(`Failed operations for user ${u.name}:`, failures);
         return;
+      }
+
+      const autoTagged = await autoTagTransactionsForUser(newTransactions, u);
+
+      if (autoTagged && autoTagged.autoTagged.length > 0) {
+        const taggedInfo = autoTagged.autoTagged.map((t) => {
+          const transaction = newTransactions.find(
+            (nt) => nt.transaction_id === t.transaction_id
+          );
+          return `${transaction?.name ?? "unknown"} → ${t.tagName}`;
+        });
+        console.log(
+          `Auto-tagged ${autoTagged.autoTagged.length} transactions:`,
+          taggedInfo
+        );
       }
 
       console.log(
