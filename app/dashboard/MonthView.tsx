@@ -187,6 +187,16 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
 
   const hierarchyForm = tagsByParent(toTrack);
 
+  // Sort so tags with allocations come first, then tags without allocations
+  const sortedHierarchy = hierarchyForm.sort((a, b) => {
+    const aHasAllocation = a.parent.tagAllocation !== null;
+    const bHasAllocation = b.parent.tagAllocation !== null;
+
+    if (aHasAllocation && !bHasAllocation) return -1;
+    if (!aHasAllocation && bHasAllocation) return 1;
+    return 0;
+  });
+
   const tags = await allUserTags();
   return (
     <div className="flex flex-col gap-5 w-full">
@@ -196,7 +206,7 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
           <AllocationEditButton />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {hierarchyForm.map((tagSpending) => {
+          {sortedHierarchy.map((tagSpending) => {
             if (!tagSpending) {
               return (
                 <div key={tagSpending}>No allocation for {tagSpending}</div>
