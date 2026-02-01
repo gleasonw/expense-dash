@@ -226,7 +226,7 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
 }
 
 function TagChild({ children }: { children: React.ReactNode }) {
-  return <div className="ml-10 mt-2">{children}</div>;
+  return <div className="opacity-50 odd:bg-gray-100 py-1">{children}</div>;
 }
 
 async function TagAllocation({
@@ -255,17 +255,11 @@ async function TagAllocation({
   if (!tagSpending.tagAllocation) {
     return (
       <div className="">
-        <div
-          className={`flex gap-2 w-full justify-between ${
-            tagSpending.depth === 1
-              ? "font-semibold text-base"
-              : "text-sm text-gray-600 py-0.5"
-          }`}
-        >
+        <div className={`flex gap-2 w-full justify-between`}>
           <span>{lowestTagForString(tagSpending.tag)}</span>
           <span>${tagSpending.amount}</span>
         </div>
-        <div>
+        <div className="flex flex-col">
           {tagSpending.depth === 1 ? (
             <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
           ) : null}
@@ -280,49 +274,54 @@ async function TagAllocation({
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
   const allocation = parseInt(tagSpending?.tagAllocation ?? "0", 10);
   const targetSpending = (allocation / 100) * estIncome;
+  const netAmount = targetSpending - Number(tagSpending.amount);
+
   return (
-    <div className="flex flex-col border border-gray-200 rounded-lg p-4 bg-white shadow-md">
-      {/* Top-level budget header */}
-      <div key={tagSpending.tag_id} className="w-full flex">
+    <div className="flex flex-col gap-4 border border-gray-200 rounded-lg p-4 bg-white shadow-md">
+      <div key={tagSpending.tag_id} className="w-full flex gap-3">
         <div className="flex-col gap-3 w-full flex">
-          <div className="flex gap-2 justify-between items-baseline">
-            <div className="text-lg font-semibold">{tagSpending.tag}</div>
-            <div className="text-base">
-              <span className="font-bold">${tagSpending.amount}</span>
-              <span className="text-gray-500"> / </span>
-              <span className="text-gray-700">
+          {/* Tag name */}
+          <div className="text-lg font-semibold">{tagSpending.tag}</div>
+
+          {/* Progress bar */}
+          <div className="w-full h-4 overflow-hidden border rounded bg-gray-100">
+            <div
+              className={`relative h-full bg-${tagSpending.color}-400`}
+              style={{
+                width: `${Math.min(
+                  (Number(tagSpending.amount) / targetSpending) * 100,
+                  100
+                )}%`,
+              }}
+            ></div>
+          </div>
+
+          {/* Budgeted / Spent / Net metrics */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500 font-medium">
+                Budgeted
+              </span>
+              <span className="text-lg text-gray-900">
                 ${Math.round(targetSpending)}
               </span>
             </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <div className="w-full h-3 overflow-hidden border rounded">
-              <div
-                className={`relative h-full bg-${tagSpending.color}-400`}
-                style={{
-                  width: `${
-                    (Number(tagSpending.amount) / targetSpending) * 100
-                  }%`,
-                }}
-              ></div>
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500 font-medium">Spent</span>
+              <span className="text-lg text-gray-900">
+                ${Math.abs(Number(tagSpending.amount))}
+              </span>
             </div>
-            <div className="flex w-full justify-between">
-              <div className="text-sm text-gray-500">
-                <span className="text-lg pr-2 text-black">
-                  {isNaN(Number(tagSpending.amount)) ? (
-                    <span className="text-right">
-                      ${targetSpending.toFixed(2)}
-                    </span>
-                  ) : (
-                    <span className="text-right">
-                      ${Math.round(targetSpending - Number(tagSpending.amount))}
-                    </span>
-                  )}
-                </span>
-                left to spend
-              </div>
-              <span className="text-sm align-bottom text-gray-500 px-2">
-                {isNaN(allocation) ? 0 : allocation}%
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500 font-medium">
+                Remaining
+              </span>
+              <span
+                className={`text-lg font-bold ${
+                  netAmount >= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                ${Math.round(Math.abs(netAmount))}
               </span>
             </div>
           </div>
@@ -331,16 +330,14 @@ async function TagAllocation({
           <AllocationDeleteButton tagId={tagSpending.tag_id} />
         )}
       </div>
-      {tagSpending.depth === 1 ? (
-        <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
-      ) : null}
+      <div className="flex flex-col ">
+        {tagSpending.depth === 1 ? (
+          <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
+        ) : null}
 
-      {/* Breakdown section */}
-      {children && (
-        <div className="mt-4 pt-3 border-t border-gray-300">
-          <div className="space-y-1">{children}</div>
-        </div>
-      )}
+        {/* Breakdown section */}
+        {children}
+      </div>
     </div>
   );
 }
@@ -385,8 +382,8 @@ async function RootSpendingForTag({
   }
   return (
     <TagChild>
-      <div className="flex gap-2 w-full justify-between opacity-50">
-        <span>{baseSpend.full_tag}</span>
+      <div className="flex gap-2 w-full justify-between">
+        <span>unbound</span>
         <span>${baseSpend.amount}</span>
       </div>
     </TagChild>
