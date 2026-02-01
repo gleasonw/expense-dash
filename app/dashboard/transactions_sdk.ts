@@ -105,14 +105,6 @@ export async function autoTagTransactionsForUser(
   }[],
   user: User
 ) {
-  console.log(
-    "here are some names",
-    ts.map((t) => t.name)
-  );
-  console.log(
-    "here are some more names",
-    ts.map((t) => t.merchant_name)
-  );
   const autoTags = await db
     .select()
     .from(auto_tag_merchants_new)
@@ -137,7 +129,6 @@ export async function autoTagTransactionsForUser(
     autoTags,
     (at) => at.merchant_name ?? ""
   );
-  console.log(`found some auto tags`, autoTags);
   const transactionsToAutotag = ts.reduce((acc, t) => {
     const autoTag =
       autoTagsByName[t.name] ??
@@ -167,7 +158,6 @@ export async function autoTagTransactionsForUser(
     )
     .returning();
   revalidatePath("/dashboard");
-  console.log({ autoTagged });
   return {
     //todo: wonky
     autoTagged: transactionsToAutotag.filter((t) =>
