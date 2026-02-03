@@ -1,48 +1,25 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
-import { Home, Menu, PiggyBank, Tag } from "lucide-react";
+import { Home, PiggyBank, Tag } from "lucide-react";
 import Link from "next/link";
-import React from "react";
 
 export function NavMenu() {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-
-  if (!isExpanded) {
-    return (
-      <Button
-        variant="ghost"
-        onClick={() => setIsExpanded(true)}
-        className="absolute"
-      >
-        <Menu />
-      </Button>
-    );
-  }
   return (
-    <div className="absolute flex flex-col">
-      <Button
-        variant="ghost"
-        onClick={() => setIsExpanded(false)}
-        aria-label="Collapse menu"
-      >
-        <Menu />
-      </Button>
-      <Link href="/dashboard">
-        <button className="p-2 border hover:bg-gray-200" aria-label="Home">
+    <aside className="flex h-full w-14 flex-col items-center gap-3 border-r bg-white/70 px-2 py-4">
+      <Button variant="ghost" size="icon" asChild>
+        <Link href="/dashboard" aria-label="Home">
           <Home />
-        </button>
-      </Link>
-      <Link href="/dashboard/savings">
-        <button className="p-2 border hover:bg-gray-200" aria-label="Savings">
+        </Link>
+      </Button>
+      <Button variant="ghost" size="icon" asChild>
+        <Link href="/dashboard/savings" aria-label="Savings">
           <PiggyBank />
-        </button>
-      </Link>
-      <Link href="/dashboard/tags">
-        <button className="p-2 border hover:bg-gray-200" aria-label="Tags">
+        </Link>
+      </Button>
+      <Button variant="ghost" size="icon" asChild>
+        <Link href="/dashboard/tags" aria-label="Tags">
           <Tag />
-        </button>
-      </Link>
-    </div>
+        </Link>
+      </Button>
+    </aside>
   );
 }
