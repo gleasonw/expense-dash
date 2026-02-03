@@ -157,7 +157,6 @@ export async function autoTagTransactionsForUser(
       }))
     )
     .returning();
-  revalidatePath("/dashboard");
   return {
     //todo: wonky
     autoTagged: transactionsToAutotag.filter((t) =>
@@ -175,7 +174,9 @@ export async function autoTagTransactions(
 ) {
   console.log(`attemping auto tag`, ts.length);
   const userWithAccount = await getUserWithTokenThrows();
-  return autoTagTransactionsForUser(ts, userWithAccount.user);
+  const res = await autoTagTransactionsForUser(ts, userWithAccount.user);
+  revalidatePath("/dashboard");
+  return res;
 }
 
 export const getTransactionsWithTags = cache(
