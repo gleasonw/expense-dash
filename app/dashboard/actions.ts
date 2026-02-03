@@ -79,6 +79,48 @@ export async function deleteTag({ tagId }: { tagId: string }) {
   revalidatePath("/dashboard/tags");
 }
 
+export async function createAutoTag(formData: FormData) {
+  const user = await getUserWithTokenThrows();
+  const name = (formData.get("name") as string | null)?.trim();
+  const merchantName = (formData.get("merchantName") as string | null)?.trim();
+  const tagId = formData.get("tagId") as string | null;
+
+  if (!name || !tagId) {
+    return;
+  }
+
+  const tag = await db.query.tags_new.findFirst({
+    where: and(eq(tags_new.id, tagId), eq(tags_new.userId, user.user.id)),
+  });
+
+  if (!tag) {
+    return;
+  }
+
+  await db.insert(auto_tag_merchants_new).values({
+    name,
+    merchant_name: merchantName || null,
+    tag_id: tagId,
+    user_id: user.user.id,
+  });
+  revalidatePath("/dashboard/tags");
+}
+
+export async function deleteAutoTag({ autoTagId }: { autoTagId: number }) {
+  const user = await getUserWithTokenThrows();
+
+  await db
+    .delete(auto_tag_merchants_new)
+    .where(
+      and(
+        eq(auto_tag_merchants_new.id, autoTagId),
+        eq(auto_tag_merchants_new.user_id, user.user.id)
+      )
+    );
+
+  revalidatePath("/dashboard/tags");
+}
+
 export async function updateTransactionDate(
   transactionId: string,
   date: string
