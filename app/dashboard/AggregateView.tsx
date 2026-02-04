@@ -38,32 +38,35 @@ export function AggregateView({
           <StartMonthPicker />
           <EndMonthPicker />
         </div>
-        <div className="ml-auto">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium">
-              Filter by Top-Level Tag
-            </label>
-            <FilterByTagDropdown
-              options={[
-                { label: "All", value: "" },
-                ...allTags
-                  .filter((tag) => !tag.tag.includes("/")) // Only show top-level tags
-                  .slice()
-                  .sort((a, b) => a.tag.localeCompare(b.tag))
-                  .map((tag) => ({ label: tag.tag, value: tag.tag })),
-              ]}
-              selectedValue={selectedTag ?? ""}
-            />
-          </div>
-        </div>
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <FeatureBox>
-          {/**@ts-expect-error css modules are a pain with ts */}
-          <div className={style.chart}>
-            <SpendingChart discretionaryByMonth={spendingData} />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">
+                Filter by Top-Level Tag
+              </label>
+              <FilterByTagDropdown
+                options={[
+                  { label: "All", value: "" },
+                  ...allTags
+                    .filter((tag) => !tag.tag.includes("/")) // Only show top-level tags
+                    .slice()
+                    .sort((a, b) => a.tag.localeCompare(b.tag))
+                    .map((tag) => ({ label: tag.tag, value: tag.tag })),
+                ]}
+                selectedValue={selectedTag ?? ""}
+              />
+              <span className="text-xs text-gray-500">
+                Applies to spending charts only.
+              </span>
+            </div>
+            {/**@ts-expect-error css modules are a pain with ts */}
+            <div className={style.chart}>
+              <SpendingChart discretionaryByMonth={spendingData} />
+            </div>
           </div>
         </FeatureBox>
 
@@ -72,7 +75,11 @@ export function AggregateView({
           <div className={style.chart}>
             <NetSpendChart
               rows={netSpendingData}
-              title="Net Spending Over Time"
+              title={
+                selectedTag
+                  ? "Net Spending Over Time (All Tags)"
+                  : "Net Spending Over Time"
+              }
             />
           </div>
         </FeatureBox>
