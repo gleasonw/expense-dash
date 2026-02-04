@@ -70,7 +70,6 @@ export default async function Dashboard({
       }),
       getNetSpendingByMonth({
         pastXMonths: monthsDiff,
-        includeTag: filterByTag,
       }),
     ]);
 

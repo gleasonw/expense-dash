@@ -116,6 +116,14 @@ export function monthSpending({
     // Use one alias consistently for the tags table.
     const T = alias(tags_new, "t");
 
+    const subtreeIncludes = includeTag
+      ? [
+          sql`(${T.tag} = ${includeTag} OR ${T.tag} LIKE ${
+            includeTag + "/"
+          } || '%')`,
+        ]
+      : [];
+
     // subtree excludes (node + descendants) applied ONCE at line_items stage
     const subtreeExcludes =
       excludeTags && excludeTags.length
@@ -142,7 +150,8 @@ export function monthSpending({
           and(
             eq(transactions.user_id, user.user.id),
             ...filterConditions,
-            ...subtreeExcludes
+            ...subtreeExcludes,
+            ...subtreeIncludes
           )
         )
         .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), ${T.tag}`)
