@@ -27,10 +27,12 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 flex flex-col antialiased relative`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 min-h-screen flex antialiased`}
       >
         <NavMenu />
-        <ReactQueryProvider>{children}</ReactQueryProvider>
+        <div className="flex-1">
+          <ReactQueryProvider>{children}</ReactQueryProvider>
+        </div>
       </body>
     </html>
   );
