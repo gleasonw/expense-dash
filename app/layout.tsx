@@ -27,7 +27,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 min-h-screen flex antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-stone-50 min-h-screen flex flex-col sm:flex-row antialiased`}
       >
         <NavMenu />
         <div className="flex-1">
