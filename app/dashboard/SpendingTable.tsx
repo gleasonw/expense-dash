@@ -1,6 +1,6 @@
 "use client";
 import { Transaction } from "plaid";
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { observer } from "mobx-react-lite";
 import { AppStoreContext, TagsContext } from "@/app/dashboard/Providers";
 import { TransactionWithTags } from "@/server/schema";
@@ -181,7 +181,6 @@ export function TransactionCategorizer({
   tagState: FormTagTransactionState;
 }) {
   const tags = useContext(TagsContext);
-  const [autoTagTransaction, setAutoTagTransaction] = useState(false);
 
   return (
     <div className="flex gap-2 flex-col">
@@ -210,7 +209,7 @@ export function TransactionCategorizer({
                   addTag({
                     transactionId: transaction.transaction_id,
                     tagId: t.id,
-                    autoTag: autoTagTransaction,
+                    autoTag: false,
                   });
                 }
               }}
@@ -220,14 +219,6 @@ export function TransactionCategorizer({
           );
         })}
       </div>
-      <label>
-        Autotag
-        <input
-          type="checkbox"
-          checked={autoTagTransaction}
-          onChange={(e) => setAutoTagTransaction(e.target.checked)}
-        />
-      </label>
     </div>
   );
 }
