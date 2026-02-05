@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export function NavMenu() {
   return (
-    <aside className="flex h-full w-14 flex-col items-center gap-3 border-r bg-white/70 px-2 py-4">
+    <aside className="w-full flex-row flex sm:flex-col h-full sm:w-14 sm:h-full items-center gap-3 border-r bg-white/70 px-2 py-4">
       <Button variant="ghost" size="icon" asChild>
         <Link href="/dashboard" aria-label="Home">
           <Home />
