@@ -19,6 +19,7 @@ export function SpendingCategorizer({
     Record<TransactionTagId, { autoTag: boolean }>
   >({});
   const [isPending, startTransition] = useTransition();
+  const [autoTagTransactions, setAutoTagTransactions] = useState(false);
 
   function removeTag({
     transactionId,
@@ -58,8 +59,9 @@ export function SpendingCategorizer({
       className="flex flex-col gap-4 p-2"
       action={() => {
         setPendingTransactionTags({});
+        console.log(pendingTransactionTags);
         startTransition(() => {
-          addTagsToTransactions(pendingTransactionTags);
+          addTagsToTransactions(pendingTransactionTags, autoTagTransactions);
         });
       }}
     >
@@ -77,9 +79,19 @@ export function SpendingCategorizer({
           </div>
         ))}
       </div>
-      <button className="bg-green-200 text-green-800 px-4 py-2 rounded-md hover:bg-green-300">
-        {isPending ? "Categorizing..." : "Categorize Transactions"}
-      </button>
+      <div className="flex gap-1">
+        <button className="bg-green-200 text-green-800 px-4 py-2 rounded-md hover:bg-green-300">
+          {isPending ? "Categorizing..." : "Categorize Transactions"}
+        </button>
+        <label className="flex flex-col items-center">
+          Autotag in future
+          <input
+            type="checkbox"
+            checked={autoTagTransactions}
+            onChange={(e) => setAutoTagTransactions(e.target.checked)}
+          />
+        </label>
+      </div>
     </form>
   );
 }

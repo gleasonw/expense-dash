@@ -196,11 +196,12 @@ export type FormTagTransactionState = Record<
 >;
 
 export async function addTagsToTransactions(
-  tags: FormTagTransactionState
+  tags: FormTagTransactionState,
+  autoTag: boolean
 ): Promise<void> {
   await getUserWithTokenThrows();
 
-  const tagsToPush = Object.entries(tags).map(([id, { autoTag }]) => {
+  const tagsToPush = Object.entries(tags).map(([id]) => {
     const { transactionId, tagId } = tagIdAndTransactionIdFromId(
       id as TransactionTagId
     );
@@ -211,9 +212,43 @@ export async function addTagsToTransactions(
     };
   });
 
-  console.log(tagsToPush);
+  console.log({ tagsToPush });
 
   await db.insert(tagsLinkNew).values(tagsToPush);
+  if (autoTag) {
+    const fullTagFullTransaction = await Promise.all(
+      tagsToPush.map(async (t) => {
+        const [fullTag, fullTransaction] = await Promise.all([
+          db.query.tags_new.findFirst({
+            where: eq(tags_new.id, t.tag_id),
+          }),
+          db.query.transactions.findFirst({
+            where: eq(transactions.transaction_id, t.transaction_id),
+          }),
+        ]);
+
+        if (!fullTag) {
+          throw new Error("tag not found");
+        }
+        if (!fullTransaction) {
+          throw new Error("transaction not found");
+        }
+
+        return { fullTag, fullTransaction };
+      })
+    );
+    const autoTagsToPush = fullTagFullTransaction.map(
+      ({ fullTag, fullTransaction }) => ({
+        name: fullTransaction.name,
+        merchant_name: fullTransaction.merchant_name,
+        tag_id: fullTag.id,
+        user_id: fullTag.userId,
+        transaction_id: fullTransaction.transaction_id,
+      })
+    );
+    console.log({ autoTagsToPush });
+    await db.insert(auto_tag_merchants_new).values(autoTagsToPush);
+  }
   revalidatePath("/dashboard");
 }
 

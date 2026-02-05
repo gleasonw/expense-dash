@@ -4,10 +4,7 @@ import { tags_new, tagsLinkNew, transactions } from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
 import { and, eq, sql } from "drizzle-orm";
 import * as R from "remeda";
-import {
-  tryAutoTagTransactions,
-  tagAllAsFirstTag,
-} from "@/app/dashboard/transactions_sdk";
+import { tagAllAsFirstTag } from "@/app/dashboard/transactions_sdk";
 import { monthSpending, SpendingRow } from "@/app/dashboard/aggregates";
 import { IS_LOCAL_HOST } from "@/env";
 import * as dateUtils from "@/app/utils/dates";
@@ -107,9 +104,6 @@ export async function MonthView({
         <SpendingCategorizer
           transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
         />
-        <button className="border" onClick={tryAutoTagTransactions}>
-          Autotag transactions
-        </button>
         {IS_LOCAL_HOST && (
           <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
         )}
