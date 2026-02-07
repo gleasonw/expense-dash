@@ -268,3 +268,56 @@ export async function getSavingsTransactionsWithAllocations(month: string) {
     ).toFixed(2),
   }));
 }
+
+export async function getHistoricalSavingsMonthlyStats(
+  month: string,
+  lookbackMonths = 6
+) {
+  const user = await getUserWithTokenThrows();
+
+  const monthUTC = dateUtils.normYyyyMm(month);
+  const safeLookback = Math.max(lookbackMonths, 1);
+  const historyStart = dateUtils.addMonths(monthUTC, -safeLookback);
+  const monthStartExpr = sql`date_trunc('month', ${transactions.date}::date)`;
+
+  const results = await db
+    .select({
+      month: sql<string>`to_char(${monthStartExpr}, 'YYYY-MM')`,
+      total: sql<string>`COALESCE(SUM(ABS(CAST(${transactions.amount} AS NUMERIC))), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(
+      tagsLinkNew,
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+    )
+    .innerJoin(
+      tags_new,
+      and(eq(tagsLinkNew.tag_id, tags_new.id), eq(tags_new.tag, "savings"))
+    )
+    .where(
+      and(
+        eq(transactions.user_id, user.user.id),
+        gte(transactions.date, historyStart),
+        lt(transactions.date, monthUTC)
+      )
+    )
+    .groupBy(monthStartExpr)
+    .orderBy(desc(monthStartExpr));
+
+  const monthlyTotals = results.map((row) => ({
+    month: row.month,
+    total: parseFloat(row.total),
+  }));
+
+  const averageMonthlySavings =
+    monthlyTotals.length === 0
+      ? 0
+      : monthlyTotals.reduce((sum, row) => sum + row.total, 0) /
+        monthlyTotals.length;
+
+  return {
+    averageMonthlySavings,
+    monthsWithSavings: monthlyTotals.length,
+    monthlyTotals,
+  };
+}

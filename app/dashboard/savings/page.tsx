@@ -2,7 +2,10 @@ import {
   getBuckets,
   getMovementsWithOrphanedStatus,
 } from "@/app/dashboard/buckets_sdk";
-import { getSavingsTransactionsWithAllocations } from "../transactions_sdk";
+import {
+  getHistoricalSavingsMonthlyStats,
+  getSavingsTransactionsWithAllocations,
+} from "../transactions_sdk";
 import { getUserWithTokenThrows } from "@/server/session";
 import { MonthBudgetOverview } from "./MonthBudgetOverview";
 import { UnallocatedTransactionsSection } from "./UnallocatedTransactionsSection";
@@ -34,11 +37,12 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
   const selectedMonth = monthUTC.slice(0, 7);
 
   // Fetch all data in parallel
-  const [buckets, savingsTransactions, movementsWithOrphaned] =
+  const [buckets, savingsTransactions, movementsWithOrphaned, historicalStats] =
     await Promise.all([
       getBuckets(),
       getSavingsTransactionsWithAllocations(selectedMonth),
       getMovementsWithOrphanedStatus(),
+      getHistoricalSavingsMonthlyStats(selectedMonth),
     ]);
 
   // Calculate budget overview data
@@ -154,6 +158,10 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
                   key={bucket.id}
                   bucket={bucket}
                   movements={bucketMovementsMap[bucket.id] || []}
+                  historicalAverageMonthlySavings={
+                    historicalStats.averageMonthlySavings
+                  }
+                  historicalMonthsWithSavings={historicalStats.monthsWithSavings}
                 />
               ))}
             </div>
