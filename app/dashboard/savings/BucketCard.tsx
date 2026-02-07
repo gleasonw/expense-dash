@@ -8,6 +8,7 @@ import { updateBucket } from "../bucket_actions";
 import { BucketEditForm } from "./BucketEditForm";
 import type { BucketWithMovements } from "../buckets_sdk";
 import { Button } from "@/components/ui/button";
+import { Info } from "lucide-react";
 
 type Movement = {
   id: number;
@@ -21,9 +22,26 @@ type Movement = {
 type BucketCardProps = {
   bucket: BucketWithMovements;
   movements: Movement[];
+  historicalAverageMonthlySavings: number;
+  historicalMonthsWithSavings: number;
 };
 
-export function BucketCard({ bucket, movements }: BucketCardProps) {
+function formatEstimatedDuration(months: number) {
+  if (months < 1) {
+    return "< 1 month";
+  }
+  if (months < 24) {
+    return `${months.toFixed(1)} months`;
+  }
+  return `${(months / 12).toFixed(1)} years`;
+}
+
+export function BucketCard({
+  bucket,
+  movements,
+  historicalAverageMonthlySavings,
+  historicalMonthsWithSavings,
+}: BucketCardProps) {
   const router = useRouter();
   const [showHistory, setShowHistory] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
@@ -56,6 +74,23 @@ export function BucketCard({ bucket, movements }: BucketCardProps) {
   const progressPercent = hasTarget
     ? Math.min((totalAllocated / (targetAmountValue ?? 1)) * 100, 100)
     : 0;
+  const remainingAmount = hasTarget
+    ? Math.max((targetAmountValue ?? 0) - totalAllocated, 0)
+    : 0;
+  const estimatedMonthlyContribution =
+    historicalAverageMonthlySavings *
+    (hasAllocationPercent ? autoAllocationPercent : 1);
+  const canEstimateCompletion =
+    hasTarget &&
+    !isCompleted &&
+    historicalMonthsWithSavings > 0 &&
+    estimatedMonthlyContribution > 0;
+  const estimatedMonthsToCompletion = canEstimateCompletion
+    ? remainingAmount / estimatedMonthlyContribution
+    : null;
+  const estimateHoverText = hasAllocationPercent
+    ? `Based on average savings of $${historicalAverageMonthlySavings.toFixed(2)} per month across ${historicalMonthsWithSavings} previous month(s), using ${(autoAllocationPercent * 100).toFixed(1)}% auto-allocation for this bucket.`
+    : `Based on average savings of $${historicalAverageMonthlySavings.toFixed(2)} per month across ${historicalMonthsWithSavings} previous month(s), assuming all monthly savings go to this bucket.`;
 
   const handleArchive = async () => {
     if (
@@ -138,6 +173,28 @@ export function BucketCard({ bucket, movements }: BucketCardProps) {
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
+            {!isCompleted && (
+              <p className="mt-2 text-xs text-gray-500">
+                <span className="inline-flex items-center gap-1">
+                  Est. completion:{" "}
+                  {estimatedMonthsToCompletion === null
+                    ? "Unavailable"
+                    : formatEstimatedDuration(estimatedMonthsToCompletion)}
+                  <span className="group relative inline-flex">
+                    <button
+                      type="button"
+                      aria-label="How this estimate is calculated"
+                      className="inline-flex rounded text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-300"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden w-64 -translate-x-1/2 rounded-md border border-gray-200 bg-white p-2 text-[11px] leading-relaxed text-gray-700 shadow-lg group-hover:block group-focus-within:block">
+                      {estimateHoverText}
+                    </span>
+                  </span>
+                </span>
+              </p>
+            )}
           </div>
 
           {isCompleted && (
