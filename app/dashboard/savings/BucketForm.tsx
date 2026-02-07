@@ -11,6 +11,7 @@ export function BucketForm() {
     targetPercentage: null,
     type: "goal",
   });
+  const [formError, setFormError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function resetForm() {
@@ -20,11 +21,16 @@ export function BucketForm() {
       targetPercentage: null,
       type: "goal",
     });
+    setFormError(null);
   }
 
   function setTargetAmount(value: string) {
     const amount = parseFloat(value);
     if (formState.type === "ongoing") {
+      return;
+    }
+    if (value.trim() === "") {
+      setFormState({ ...formState, targetAmount: null });
       return;
     }
     if (!isNaN(amount) && amount >= 0) {
@@ -33,10 +39,14 @@ export function BucketForm() {
   }
 
   function setTargetPercentage(value: string) {
-    if (formState.type === "goal") {
+    if (value.trim() === "") {
+      setFormState({ ...formState, targetPercentage: null });
       return;
     }
-    setFormState({ ...formState, targetPercentage: value });
+    const percent = parseFloat(value);
+    if (!isNaN(percent) && percent >= 0 && percent <= 1) {
+      setFormState({ ...formState, targetPercentage: value });
+    }
   }
 
   function setType(type: string) {
@@ -45,7 +55,7 @@ export function BucketForm() {
     }
     switch (type) {
       case "goal":
-        setFormState({ ...formState, targetPercentage: null, type: "goal" });
+        setFormState({ ...formState, type: "goal" });
         break;
       case "ongoing":
         setFormState({ ...formState, targetAmount: null, type: "ongoing" });
@@ -62,10 +72,24 @@ export function BucketForm() {
       className="flex flex-col gap-5 max-w-[300px] p-5 shadow-lg"
       onSubmit={(e) => {
         e.preventDefault();
+        setFormError(null);
+        if (formState.type === "goal" && !formState.targetAmount) {
+          setFormError("Goal buckets need a target amount.");
+          return;
+        }
+        if (formState.type === "ongoing" && !formState.targetPercentage) {
+          setFormError("Ongoing buckets need an allocation percentage.");
+          return;
+        }
         startTransition(() => {
-          createBucket(formState);
+          createBucket(formState).then((result) => {
+            if (result?.success === false) {
+              setFormError(result.message);
+              return;
+            }
+            resetForm();
+          });
         });
-        resetForm();
       }}
     >
       <input
@@ -79,16 +103,24 @@ export function BucketForm() {
         <option value="ongoing">Ongoing</option>
       </select>
       {formState.type === "goal" ? (
-        <input
-          type="text"
-          placeholder="Target Amount"
-          value={formState.targetAmount || ""}
-          onChange={(e) => setTargetAmount(e.target.value)}
-        />
+        <>
+          <input
+            type="text"
+            placeholder="Target Amount"
+            value={formState.targetAmount || ""}
+            onChange={(e) => setTargetAmount(e.target.value)}
+          />
+          <input
+            type="text"
+            placeholder="Allocation Percentage (optional, 0-1)"
+            value={formState.targetPercentage || ""}
+            onChange={(e) => setTargetPercentage(e.target.value)}
+          />
+        </>
       ) : (
         <input
           type="text"
-          placeholder="Target Percentage"
+          placeholder="Allocation Percentage (0-1)"
           value={formState.targetPercentage || ""}
           onChange={(e) => setTargetPercentage(e.target.value)}
         />
@@ -96,6 +128,7 @@ export function BucketForm() {
       <button type="submit" className="p-2 bg-blue-500 text-white">
         {isPending ? "Creating..." : "Create Bucket"}
       </button>
+      {formError && <p className="text-sm text-red-600">{formError}</p>}
       <button type="button" className="p-2 bg-gray-300" onClick={resetForm}>
         Reset
       </button>

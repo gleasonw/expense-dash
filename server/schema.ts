@@ -273,7 +273,7 @@ export const buckets = pgTable(
     ),
     check(
       "goalShape",
-      sql`((${t.type} <> 'goal') OR (${t.targetAmount} IS NOT NULL AND ${t.targetPercentage} IS NULL))`
+      sql`((${t.type} <> 'goal') OR (${t.targetAmount} IS NOT NULL))`
     ),
     check(
       "ongoingShape",
