@@ -10,18 +10,33 @@ import { UnallocatedTransactionsSection } from "./UnallocatedTransactionsSection
 import { AutoAllocationSuggestions } from "./AutoAllocationSuggestions";
 import { BucketForm } from "./BucketForm";
 import { BucketCard } from "./BucketCard";
+import { MonthPicker } from "@/app/dashboard/MonthPicker";
+import * as dateUtils from "@/app/utils/dates";
 
-export default async function Savings() {
+type SavingsPageProps = {
+  searchParams?: Record<string, string | string[] | undefined>;
+};
+
+function normalizeSearchParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+  return value ?? "";
+}
+
+export default async function Savings({ searchParams }: SavingsPageProps) {
   await getUserWithTokenThrows();
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const monthParam = normalizeSearchParam(searchParams?.monthUTC).trim();
+  const monthUTC = dateUtils.normYyyyMm(monthParam || undefined);
+  const selectedMonth = monthUTC.slice(0, 7);
 
   // Fetch all data in parallel
   const [buckets, savingsTarget, savingsTransactions, movementsWithOrphaned] =
     await Promise.all([
       getBuckets(),
       getMonthTargetForTag("savings"),
-      getSavingsTransactionsWithAllocations(currentMonth),
+      getSavingsTransactionsWithAllocations(selectedMonth),
       getMovementsWithOrphanedStatus(),
     ]);
 
@@ -74,16 +89,24 @@ export default async function Savings() {
 
   return (
     <div className="p-6 max-w-7xl w-full mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Savings Dashboard
-        </h1>
-        <p className="text-gray-600">
-          Track your savings goals and allocate your monthly savings
-        </p>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Savings Dashboard
+          </h1>
+          <p className="text-gray-600">
+            Track your savings goals and allocate your monthly savings
+          </p>
+        </div>
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+          <label className="text-sm font-medium text-gray-700 mb-1 block">
+            Month
+          </label>
+          <MonthPicker monthUTC={monthUTC} />
+        </div>
       </div>
 
-      <MonthBudgetOverview data={budgetData} month={currentMonth} />
+      <MonthBudgetOverview data={budgetData} month={selectedMonth} />
 
       <UnallocatedTransactionsSection
         transactions={savingsTransactions}
@@ -91,7 +114,7 @@ export default async function Savings() {
       />
 
       <AutoAllocationSuggestions
-        currentMonth={currentMonth}
+        currentMonth={selectedMonth}
         hasOngoingBuckets={ongoingBuckets.length > 0}
       />
 
