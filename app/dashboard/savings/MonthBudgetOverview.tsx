@@ -14,6 +14,11 @@ export function MonthBudgetOverview({
   data: MonthBudgetData;
   month: string;
 }) {
+  const [yearPart, monthPart] = month.split("-");
+  const monthDateUTC = new Date(
+    Date.UTC(Number(yearPart), Number(monthPart) - 1, 1)
+  );
+
   const percentAllocated =
     data.totalBudget > 0
       ? ((data.allocated / data.totalBudget) * 100).toFixed(1)
@@ -22,9 +27,10 @@ export function MonthBudgetOverview({
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
       <h2 className="text-xl font-semibold mb-4">
-        {new Date(month + "-01").toLocaleDateString("en-US", {
+        {monthDateUTC.toLocaleDateString("en-US", {
           month: "long",
           year: "numeric",
+          timeZone: "UTC",
         })}{" "}
         Savings Budget
       </h2>
