@@ -20,12 +20,10 @@ const MAX_SUGGESTIONS = 20;
 const MIN_QUERY_LENGTH = 2;
 
 type TagsPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function normalizeSearchParam(
-  value: string | string[] | undefined
-): string {
+function normalizeSearchParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
     return value[0] ?? "";
   }
@@ -39,9 +37,11 @@ function escapeLike(value: string) {
 export default async function TagsPage({ searchParams }: TagsPageProps) {
   const user = await getUserWithTokenThrows();
   const transactionQuery = normalizeSearchParam(
-    searchParams?.transaction
+    (await searchParams)?.transaction
   ).trim();
-  const merchantQuery = normalizeSearchParam(searchParams?.merchant).trim();
+  const merchantQuery = normalizeSearchParam(
+    (await searchParams)?.merchant
+  ).trim();
   const transactionLike =
     transactionQuery.length >= MIN_QUERY_LENGTH
       ? `%${escapeLike(transactionQuery)}%`
@@ -53,62 +53,62 @@ export default async function TagsPage({ searchParams }: TagsPageProps) {
 
   const [userTags, autoTags, transactionNameRows, merchantNameRows] =
     await Promise.all([
-    db
-      .select()
-      .from(tags_new)
-      .where(eq(tags_new.userId, user.user.id))
-      .orderBy(asc(tags_new.label)),
-    db
-      .select({
-        id: auto_tag_merchants_new.id,
-        name: auto_tag_merchants_new.name,
-        merchantName: auto_tag_merchants_new.merchant_name,
-        tagId: auto_tag_merchants_new.tag_id,
-        tagLabel: tags_new.label,
-        tagColor: tags_new.color,
-      })
-      .from(auto_tag_merchants_new)
-      .innerJoin(tags_new, eq(auto_tag_merchants_new.tag_id, tags_new.id))
-      .where(eq(auto_tag_merchants_new.user_id, user.user.id))
-      .orderBy(asc(auto_tag_merchants_new.name)),
-    db
-      .select({ name: transactions.name })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.user_id, user.user.id),
-          ne(transactions.name, ""),
-          ...(transactionLike
-            ? [
-                sql`${transactions.name} ILIKE ${transactionLike} ESCAPE '\\'`,
-              ]
-            : [])
+      db
+        .select()
+        .from(tags_new)
+        .where(eq(tags_new.userId, user.user.id))
+        .orderBy(asc(tags_new.label)),
+      db
+        .select({
+          id: auto_tag_merchants_new.id,
+          name: auto_tag_merchants_new.name,
+          merchantName: auto_tag_merchants_new.merchant_name,
+          tagId: auto_tag_merchants_new.tag_id,
+          tagLabel: tags_new.label,
+          tagColor: tags_new.color,
+        })
+        .from(auto_tag_merchants_new)
+        .innerJoin(tags_new, eq(auto_tag_merchants_new.tag_id, tags_new.id))
+        .where(eq(auto_tag_merchants_new.user_id, user.user.id))
+        .orderBy(asc(auto_tag_merchants_new.name)),
+      db
+        .select({ name: transactions.name })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.user_id, user.user.id),
+            ne(transactions.name, ""),
+            ...(transactionLike
+              ? [sql`${transactions.name} ILIKE ${transactionLike} ESCAPE '\\'`]
+              : [])
+          )
         )
-      )
-      .groupBy(transactions.name)
-      .orderBy(asc(transactions.name))
-      .limit(MAX_SUGGESTIONS),
-    db
-      .select({ merchantName: transactions.merchant_name })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.user_id, user.user.id),
-          isNotNull(transactions.merchant_name),
-          ne(transactions.merchant_name, ""),
-          ...(merchantLike
-            ? [
-                sql`${transactions.merchant_name} ILIKE ${merchantLike} ESCAPE '\\'`,
-              ]
-            : [])
+        .groupBy(transactions.name)
+        .orderBy(asc(transactions.name))
+        .limit(MAX_SUGGESTIONS),
+      db
+        .select({ merchantName: transactions.merchant_name })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.user_id, user.user.id),
+            isNotNull(transactions.merchant_name),
+            ne(transactions.merchant_name, ""),
+            ...(merchantLike
+              ? [
+                  sql`${transactions.merchant_name} ILIKE ${merchantLike} ESCAPE '\\'`,
+                ]
+              : [])
+          )
         )
-      )
-      .groupBy(transactions.merchant_name)
-      .orderBy(asc(transactions.merchant_name))
-      .limit(MAX_SUGGESTIONS),
-  ]);
+        .groupBy(transactions.merchant_name)
+        .orderBy(asc(transactions.merchant_name))
+        .limit(MAX_SUGGESTIONS),
+    ]);
 
-  const transactionNameSuggestions = transactionNameRows.map(({ name }) => name);
+  const transactionNameSuggestions = transactionNameRows.map(
+    ({ name }) => name
+  );
   const merchantNameSuggestions = merchantNameRows
     .map(({ merchantName }) => merchantName)
     .filter((merchantName): merchantName is string => Boolean(merchantName));
