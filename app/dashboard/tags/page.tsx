@@ -4,15 +4,55 @@ import {
   deleteAutoTag,
   deleteTag,
 } from "@/app/dashboard/actions";
+import { AutoTagAutocompleteInput } from "@/app/dashboard/AutoTagAutocompleteInput";
 import { TagColorPicker } from "@/app/dashboard/TagColorPicker";
 import { db } from "@/server/db";
-import { auto_tag_merchants_new, Tag, tags_new } from "@/server/schema";
+import {
+  auto_tag_merchants_new,
+  Tag,
+  tags_new,
+  transactions,
+} from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
-import { eq, asc } from "drizzle-orm";
+import { and, asc, eq, isNotNull, ne, sql } from "drizzle-orm";
 
-export default async function TagsPage() {
+const MAX_SUGGESTIONS = 20;
+const MIN_QUERY_LENGTH = 2;
+
+type TagsPageProps = {
+  searchParams?: Record<string, string | string[] | undefined>;
+};
+
+function normalizeSearchParam(
+  value: string | string[] | undefined
+): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+  return value ?? "";
+}
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
+export default async function TagsPage({ searchParams }: TagsPageProps) {
   const user = await getUserWithTokenThrows();
-  const [userTags, autoTags] = await Promise.all([
+  const transactionQuery = normalizeSearchParam(
+    searchParams?.transaction
+  ).trim();
+  const merchantQuery = normalizeSearchParam(searchParams?.merchant).trim();
+  const transactionLike =
+    transactionQuery.length >= MIN_QUERY_LENGTH
+      ? `%${escapeLike(transactionQuery)}%`
+      : null;
+  const merchantLike =
+    merchantQuery.length >= MIN_QUERY_LENGTH
+      ? `%${escapeLike(merchantQuery)}%`
+      : null;
+
+  const [userTags, autoTags, transactionNameRows, merchantNameRows] =
+    await Promise.all([
     db
       .select()
       .from(tags_new)
@@ -31,7 +71,47 @@ export default async function TagsPage() {
       .innerJoin(tags_new, eq(auto_tag_merchants_new.tag_id, tags_new.id))
       .where(eq(auto_tag_merchants_new.user_id, user.user.id))
       .orderBy(asc(auto_tag_merchants_new.name)),
+    db
+      .select({ name: transactions.name })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.user_id, user.user.id),
+          ne(transactions.name, ""),
+          ...(transactionLike
+            ? [
+                sql`${transactions.name} ILIKE ${transactionLike} ESCAPE '\\'`,
+              ]
+            : [])
+        )
+      )
+      .groupBy(transactions.name)
+      .orderBy(asc(transactions.name))
+      .limit(MAX_SUGGESTIONS),
+    db
+      .select({ merchantName: transactions.merchant_name })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.user_id, user.user.id),
+          isNotNull(transactions.merchant_name),
+          ne(transactions.merchant_name, ""),
+          ...(merchantLike
+            ? [
+                sql`${transactions.merchant_name} ILIKE ${merchantLike} ESCAPE '\\'`,
+              ]
+            : [])
+        )
+      )
+      .groupBy(transactions.merchant_name)
+      .orderBy(asc(transactions.merchant_name))
+      .limit(MAX_SUGGESTIONS),
   ]);
+
+  const transactionNameSuggestions = transactionNameRows.map(({ name }) => name);
+  const merchantNameSuggestions = merchantNameRows
+    .map(({ merchantName }) => merchantName)
+    .filter((merchantName): merchantName is string => Boolean(merchantName));
   return (
     <div className="flex flex-col gap-5 p-5 max-w-5xl mx-auto">
       <section className="flex flex-col gap-4">
@@ -50,7 +130,11 @@ export default async function TagsPage() {
             Automatically tag matching transactions by name or merchant.
           </p>
         </div>
-        <AutoTagMaker tags={userTags} />
+        <AutoTagMaker
+          tags={userTags}
+          transactionNameSuggestions={transactionNameSuggestions}
+          merchantNameSuggestions={merchantNameSuggestions}
+        />
         <div className="flex flex-col gap-3">
           {autoTags.length === 0 ? (
             <p className="text-sm text-gray-500">No auto tags yet.</p>
@@ -100,28 +184,32 @@ function TagCard({ tag }: { tag: Tag }) {
   );
 }
 
-async function AutoTagMaker({ tags }: { tags: Tag[] }) {
+async function AutoTagMaker({
+  tags,
+  transactionNameSuggestions,
+  merchantNameSuggestions,
+}: {
+  tags: Tag[];
+  transactionNameSuggestions: string[];
+  merchantNameSuggestions: string[];
+}) {
   return (
     <form action={createAutoTag} className="flex flex-wrap gap-3 items-end">
-      <label className="flex flex-col text-sm gap-1">
-        Transaction name
-        <input
-          name="name"
-          type="text"
-          className="border rounded-md px-2 py-1 shadow-xs"
-          placeholder="e.g. Starbucks"
-          required
-        />
-      </label>
-      <label className="flex flex-col text-sm gap-1">
-        Merchant name (optional)
-        <input
-          name="merchantName"
-          type="text"
-          className="border rounded-md px-2 py-1 shadow-xs"
-          placeholder="Merchant name"
-        />
-      </label>
+      <AutoTagAutocompleteInput
+        label="Transaction name"
+        name="name"
+        placeholder="e.g. Starbucks"
+        queryParam="transaction"
+        suggestions={transactionNameSuggestions}
+        required
+      />
+      <AutoTagAutocompleteInput
+        label="Merchant name (optional)"
+        name="merchantName"
+        placeholder="Merchant name"
+        queryParam="merchant"
+        suggestions={merchantNameSuggestions}
+      />
       <label className="flex flex-col text-sm gap-1">
         Tag
         <select
