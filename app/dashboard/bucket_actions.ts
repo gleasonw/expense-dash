@@ -30,7 +30,6 @@ export async function removeMovementsFromBucket(bucketId: number) {
 
 export async function deleteBucket(bucketId: number) {
   const user = await getUserWithTokenThrows();
-  console.log("Deleting bucket", { bucketId, user: user.user });
   await db
     .delete(buckets)
     .where(and(eq(buckets.id, bucketId), eq(buckets.userId, user.user.id)));
@@ -43,7 +42,18 @@ export async function deleteBucket(bucketId: number) {
 
 export async function createBucket(bucket: Omit<PostBucket, "userId">) {
   const user = await getUserWithTokenThrows();
-  console.log("Creating bucket", { bucket, user: user.user });
+  if (bucket.type === "goal" && !bucket.targetAmount) {
+    return {
+      success: false,
+      message: "Goal buckets require a target amount.",
+    };
+  }
+  if (bucket.type === "ongoing" && !bucket.targetPercentage) {
+    return {
+      success: false,
+      message: "Ongoing buckets require an allocation percentage.",
+    };
+  }
   await db.insert(buckets).values({
     ...bucket,
     userId: user.user.id,
@@ -124,11 +134,15 @@ export async function updateBucket(
 export async function generateSuggestedAllocations(month: string) {
   await getUserWithTokenThrows();
 
-  // Get ongoing buckets
+  // Get buckets with allocation percentages
   const allBuckets = await getBuckets();
-  const ongoingBuckets = allBuckets.filter(
-    (b) => b.type === "ongoing" && !b.isArchived
-  );
+  const eligibleBuckets = allBuckets.filter((b) => {
+    if (b.isArchived) {
+      return false;
+    }
+    const percentage = parseFloat(b.targetPercentage ?? "0");
+    return percentage > 0;
+  });
 
   // Get unallocated savings transactions
   const savingsTransactions = await getSavingsTransactionsWithAllocations(
@@ -148,20 +162,49 @@ export async function generateSuggestedAllocations(month: string) {
     transactionDate: string;
   }> = [];
 
+  const goalRemaining = new Map<number, number>();
+  for (const bucket of eligibleBuckets) {
+    if (bucket.type !== "goal") {
+      continue;
+    }
+    const targetAmount = parseFloat(bucket.targetAmount ?? "0");
+    const totalAllocated = bucket.movements.reduce(
+      (sum, movement) => sum + parseFloat(movement.amount),
+      0
+    );
+    const remaining = Math.max(targetAmount - totalAllocated, 0);
+    goalRemaining.set(bucket.id, remaining);
+  }
+
   for (const transaction of unallocatedTransactions) {
     const unallocated = parseFloat(transaction.unallocatedAmount);
 
-    for (const bucket of ongoingBuckets) {
+    for (const bucket of eligibleBuckets) {
       const percentage = parseFloat(bucket.targetPercentage ?? "0");
-      const suggestedAmount = (unallocated * percentage).toFixed(2);
+      if (percentage <= 0) {
+        continue;
+      }
+      const baseAmount = unallocated * percentage;
+      let suggestedAmount = baseAmount;
 
-      if (parseFloat(suggestedAmount) > 0) {
+      if (bucket.type === "goal") {
+        const remaining = goalRemaining.get(bucket.id) ?? 0;
+        if (remaining <= 0) {
+          continue;
+        }
+        suggestedAmount = Math.min(baseAmount, remaining);
+        goalRemaining.set(bucket.id, remaining - suggestedAmount);
+      }
+
+      const formattedAmount = suggestedAmount.toFixed(2);
+
+      if (parseFloat(formattedAmount) > 0) {
         suggestions.push({
           transactionId: transaction.transactionId,
           transactionName: transaction.transactionName,
           bucketId: bucket.id,
           bucketName: bucket.name,
-          amount: suggestedAmount,
+          amount: formattedAmount,
           transactionDate: transaction.transactionDate,
         });
       }

@@ -68,6 +68,9 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
   // Group buckets by type
   const goalBuckets = activeBuckets.filter((b) => b.type === "goal");
   const ongoingBuckets = activeBuckets.filter((b) => b.type === "ongoing");
+  const hasAllocationBuckets = activeBuckets.some(
+    (b) => parseFloat(b.targetPercentage ?? "0") > 0
+  );
 
   // Map movements to buckets with orphaned status
   type MovementWithOrphaned = {
@@ -115,7 +118,7 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
 
       <AutoAllocationSuggestions
         currentMonth={selectedMonth}
-        hasOngoingBuckets={ongoingBuckets.length > 0}
+        hasAllocationBuckets={hasAllocationBuckets}
       />
 
       <div className="mb-6">

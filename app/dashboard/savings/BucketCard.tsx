@@ -46,6 +46,7 @@ export function BucketCard({
   const isGoal = bucket.type === "goal";
   const targetAmount = parseFloat(bucket.targetAmount ?? "0");
   const targetPercentage = parseFloat(bucket.targetPercentage ?? "0");
+  const hasAllocationPercent = targetPercentage > 0;
 
   const isCompleted = isGoal
     ? totalAllocated >= targetAmount
@@ -110,6 +111,11 @@ export function BucketCard({
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
+            {hasAllocationPercent && (
+              <p className="text-xs text-gray-500 mt-2">
+                Auto allocation: {(targetPercentage * 100).toFixed(1)}%
+              </p>
+            )}
           </div>
 
           {isCompleted && (

@@ -19,17 +19,17 @@ type Suggestion = {
 
 export function AutoAllocationSuggestions({
   currentMonth,
-  hasOngoingBuckets,
+  hasAllocationBuckets,
 }: {
   currentMonth: string;
-  hasOngoingBuckets: boolean;
+  hasAllocationBuckets: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
-  if (!hasOngoingBuckets) {
+  if (!hasAllocationBuckets) {
     return null;
   }
 
@@ -97,7 +97,7 @@ export function AutoAllocationSuggestions({
       {showSuggestions && suggestions.length > 0 && (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <p className="text-sm font-medium text-blue-900 mb-3">
-            Suggested allocations based on your ongoing bucket percentages:
+            Suggested allocations based on your bucket percentages:
           </p>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {suggestions.map((s, idx) => (
