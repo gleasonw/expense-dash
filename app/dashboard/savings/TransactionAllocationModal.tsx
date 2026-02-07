@@ -22,7 +22,8 @@ import { createMovement } from "../bucket_actions";
 type Bucket = {
   id: number;
   name: string;
-  type: "goal" | "ongoing";
+  targetAmount: string | null;
+  autoAllocationPercent: string | null;
 };
 
 type AllocationModalProps = {
@@ -169,14 +170,22 @@ export function TransactionAllocationModal({
                       <SelectValue placeholder="Select bucket" />
                     </SelectTrigger>
                     <SelectContent>
-                      {buckets.map((bucket) => (
-                        <SelectItem
-                          key={bucket.id}
-                          value={bucket.id.toString()}
-                        >
-                          {bucket.name} ({bucket.type})
-                        </SelectItem>
-                      ))}
+                      {buckets.map((bucket) => {
+                        const hasAuto =
+                          bucket.autoAllocationPercent !== null &&
+                          parseFloat(bucket.autoAllocationPercent) > 0;
+                        return (
+                          <SelectItem
+                            key={bucket.id}
+                            value={bucket.id.toString()}
+                          >
+                            {bucket.name}
+                            {hasAuto
+                              ? ` • Auto ${(parseFloat(bucket.autoAllocationPercent ?? "0") * 100).toFixed(1)}%`
+                              : ""}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>

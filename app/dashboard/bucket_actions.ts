@@ -42,17 +42,29 @@ export async function deleteBucket(bucketId: number) {
 
 export async function createBucket(bucket: Omit<PostBucket, "userId">) {
   const user = await getUserWithTokenThrows();
-  if (bucket.type === "goal" && !bucket.targetAmount) {
+  if (!bucket.name.trim()) {
     return {
       success: false,
-      message: "Goal buckets require a target amount.",
+      message: "Bucket name is required.",
     };
   }
-  if (bucket.type === "ongoing" && !bucket.targetPercentage) {
-    return {
-      success: false,
-      message: "Ongoing buckets require an allocation percentage.",
-    };
+  if (bucket.targetAmount) {
+    const amount = parseFloat(bucket.targetAmount);
+    if (Number.isNaN(amount) || amount < 0) {
+      return {
+        success: false,
+        message: "Target amount must be a positive number.",
+      };
+    }
+  }
+  if (bucket.autoAllocationPercent) {
+    const percent = parseFloat(bucket.autoAllocationPercent);
+    if (Number.isNaN(percent) || percent < 0 || percent > 1) {
+      return {
+        success: false,
+        message: "Auto-allocation percent must be between 0 and 1.",
+      };
+    }
   }
   await db.insert(buckets).values({
     ...bucket,
@@ -116,11 +128,61 @@ export async function updateBucket(
   updates: Partial<Omit<PostBucket, "userId">>
 ) {
   const user = await getUserWithTokenThrows();
+  const normalizedUpdates = {
+    ...updates,
+    targetAmount: updates.targetAmount === "" ? null : updates.targetAmount,
+    autoAllocationPercent:
+      updates.autoAllocationPercent === "" ? null : updates.autoAllocationPercent,
+  };
+  const existing = await db.query.buckets.findFirst({
+    where: (buckets, { and, eq }) =>
+      and(eq(buckets.id, bucketId), eq(buckets.userId, user.user.id)),
+  });
+  if (!existing) {
+    return {
+      success: false,
+      message: "Bucket not found.",
+    };
+  }
+
+  const merged = { ...existing, ...normalizedUpdates };
+  if (!String(merged.name).trim()) {
+    return {
+      success: false,
+      message: "Bucket name is required.",
+    };
+  }
+  const targetAmount =
+    merged.targetAmount === null || merged.targetAmount === undefined
+      ? null
+      : parseFloat(String(merged.targetAmount));
+  const autoAllocationPercent =
+    merged.autoAllocationPercent === null || merged.autoAllocationPercent === undefined
+      ? null
+      : parseFloat(String(merged.autoAllocationPercent));
+  if (targetAmount !== null && (Number.isNaN(targetAmount) || targetAmount < 0)) {
+    return {
+      success: false,
+      message: "Target amount must be a positive number.",
+    };
+  }
+  if (
+    autoAllocationPercent !== null &&
+    (Number.isNaN(autoAllocationPercent) ||
+      autoAllocationPercent < 0 ||
+      autoAllocationPercent > 1)
+  ) {
+      return {
+        success: false,
+        message: "Auto-allocation percent must be between 0 and 1.",
+      };
+  }
+
   console.log("Updating bucket", { bucketId, updates, user: user.user });
   await db
     .update(buckets)
     .set({
-      ...updates,
+      ...normalizedUpdates,
       updatedAt: new Date(),
     })
     .where(and(eq(buckets.id, bucketId), eq(buckets.userId, user.user.id)));
@@ -134,13 +196,13 @@ export async function updateBucket(
 export async function generateSuggestedAllocations(month: string) {
   await getUserWithTokenThrows();
 
-  // Get buckets with allocation percentages
+  // Get buckets with auto-allocation percentages
   const allBuckets = await getBuckets();
   const eligibleBuckets = allBuckets.filter((b) => {
     if (b.isArchived) {
       return false;
     }
-    const percentage = parseFloat(b.targetPercentage ?? "0");
+    const percentage = parseFloat(b.autoAllocationPercent ?? "0");
     return percentage > 0;
   });
 
@@ -162,38 +224,39 @@ export async function generateSuggestedAllocations(month: string) {
     transactionDate: string;
   }> = [];
 
-  const goalRemaining = new Map<number, number>();
+  const targetRemaining = new Map<number, number>();
   for (const bucket of eligibleBuckets) {
-    if (bucket.type !== "goal") {
-      continue;
+    const targetAmount = bucket.targetAmount
+      ? parseFloat(bucket.targetAmount)
+      : null;
+    if (targetAmount && !Number.isNaN(targetAmount) && targetAmount > 0) {
+      const totalAllocated = bucket.movements.reduce(
+        (sum, movement) => sum + parseFloat(movement.amount),
+        0
+      );
+      const remaining = Math.max(targetAmount - totalAllocated, 0);
+      targetRemaining.set(bucket.id, remaining);
     }
-    const targetAmount = parseFloat(bucket.targetAmount ?? "0");
-    const totalAllocated = bucket.movements.reduce(
-      (sum, movement) => sum + parseFloat(movement.amount),
-      0
-    );
-    const remaining = Math.max(targetAmount - totalAllocated, 0);
-    goalRemaining.set(bucket.id, remaining);
   }
 
   for (const transaction of unallocatedTransactions) {
     const unallocated = parseFloat(transaction.unallocatedAmount);
 
     for (const bucket of eligibleBuckets) {
-      const percentage = parseFloat(bucket.targetPercentage ?? "0");
+      const percentage = parseFloat(bucket.autoAllocationPercent ?? "0");
       if (percentage <= 0) {
         continue;
       }
       const baseAmount = unallocated * percentage;
       let suggestedAmount = baseAmount;
 
-      if (bucket.type === "goal") {
-        const remaining = goalRemaining.get(bucket.id) ?? 0;
+      const remaining = targetRemaining.get(bucket.id);
+      if (remaining !== undefined) {
         if (remaining <= 0) {
           continue;
         }
         suggestedAmount = Math.min(baseAmount, remaining);
-        goalRemaining.set(bucket.id, remaining - suggestedAmount);
+        targetRemaining.set(bucket.id, remaining - suggestedAmount);
       }
 
       const formattedAmount = suggestedAmount.toFixed(2);

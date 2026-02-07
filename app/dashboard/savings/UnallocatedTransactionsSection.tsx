@@ -17,15 +17,18 @@ type UnallocatedTransaction = {
 type Bucket = {
   id: number;
   name: string;
-  type: "goal" | "ongoing";
+  targetAmount: string | null;
+  autoAllocationPercent: string | null;
 };
 
 export function UnallocatedTransactionsSection({
   transactions,
   buckets,
+  extra,
 }: {
   transactions: UnallocatedTransaction[];
   buckets: Bucket[];
+  extra?: React.ReactNode;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<{
@@ -55,13 +58,7 @@ export function UnallocatedTransactionsSection({
   };
 
   if (unallocatedTransactions.length === 0) {
-    return (
-      <div className="bg-green-50 p-6 rounded-lg border border-green-200 mb-6">
-        <p className="text-green-800">
-          ✓ All savings transactions have been fully allocated!
-        </p>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -119,6 +116,7 @@ export function UnallocatedTransactionsSection({
               </Button>
             </div>
           ))}
+          {extra}
         </div>
       </div>
 
