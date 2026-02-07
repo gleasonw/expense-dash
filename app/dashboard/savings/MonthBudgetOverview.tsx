@@ -63,15 +63,6 @@ export function MonthBudgetOverview({
         </div>
       </div>
 
-      {data.remaining < 0 && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-800">
-            ⚠️ Warning: Allocations exceed savings budget by $
-            {Math.abs(data.remaining).toFixed(2)}
-          </p>
-        </div>
-      )}
-
       {data.orphanedCount > 0 && (
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
           <p className="text-sm text-yellow-800">

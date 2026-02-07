@@ -13,7 +13,8 @@ type Transaction = {
 type Bucket = {
   id: number;
   name: string;
-  type: "goal" | "ongoing";
+  targetAmount: string | null;
+  autoAllocationPercent: string | null;
 };
 
 export function AllocationModalProvider({

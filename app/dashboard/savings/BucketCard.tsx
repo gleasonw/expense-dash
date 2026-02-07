@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { MovementHistoryList } from "./MovementHistoryList";
 import { DeleteBucketButton } from "./DeleteBucketButton";
 import { updateBucket } from "../bucket_actions";
-import { MovementForm } from "./MovementForm";
-import { MarkOngoingCompleteButton } from "./MarkOngoingCompleteButton";
+import { BucketEditForm } from "./BucketEditForm";
 import type { BucketWithMovements } from "../buckets_sdk";
+import { Button } from "@/components/ui/button";
 
 type Movement = {
   id: number;
@@ -22,17 +21,13 @@ type Movement = {
 type BucketCardProps = {
   bucket: BucketWithMovements;
   movements: Movement[];
-  savingsTarget: number;
 };
 
-export function BucketCard({
-  bucket,
-  movements,
-  savingsTarget,
-}: BucketCardProps) {
+export function BucketCard({ bucket, movements }: BucketCardProps) {
   const router = useRouter();
   const [showHistory, setShowHistory] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const handleRefresh = () => {
     router.refresh();
@@ -43,21 +38,29 @@ export function BucketCard({
     0
   );
 
-  const isGoal = bucket.type === "goal";
-  const targetAmount = parseFloat(bucket.targetAmount ?? "0");
-  const targetPercentage = parseFloat(bucket.targetPercentage ?? "0");
-  const hasAllocationPercent = targetPercentage > 0;
+  const targetAmountValue =
+    bucket.targetAmount === null || bucket.targetAmount === undefined
+      ? null
+      : parseFloat(bucket.targetAmount);
+  const hasTarget =
+    targetAmountValue !== null &&
+    !Number.isNaN(targetAmountValue) &&
+    targetAmountValue > 0;
+  const autoAllocationPercent = parseFloat(bucket.autoAllocationPercent ?? "0");
+  const hasAllocationPercent = autoAllocationPercent > 0;
 
-  const isCompleted = isGoal
-    ? totalAllocated >= targetAmount
-    : Math.abs(totalAllocated - savingsTarget * targetPercentage) < 0.01;
+  const isCompleted = hasTarget
+    ? totalAllocated >= (targetAmountValue ?? 0)
+    : false;
 
-  const progressPercent = isGoal
-    ? Math.min((totalAllocated / targetAmount) * 100, 100)
+  const progressPercent = hasTarget
+    ? Math.min((totalAllocated / (targetAmountValue ?? 1)) * 100, 100)
     : 0;
 
   const handleArchive = async () => {
-    if (!confirm("Archive this goal? It will be hidden from the main view.")) {
+    if (
+      !confirm("Archive this bucket? It will be hidden from the main view.")
+    ) {
       return;
     }
 
@@ -72,8 +75,6 @@ export function BucketCard({
     }
   };
 
-  const expectedMonthly = savingsTarget * targetPercentage;
-
   return (
     <div
       className={`p-5 rounded-lg border-2 shadow-sm relative ${
@@ -82,25 +83,51 @@ export function BucketCard({
           : "bg-white border-gray-200"
       }`}
     >
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex-1">
           <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             {bucket.name}
             {isCompleted && <span className="text-2xl">🎉</span>}
           </h4>
-          <p className="text-xs text-gray-500 uppercase tracking-wide">
-            {isGoal ? "Goal" : "Ongoing"}
-          </p>
+          {hasAllocationPercent && (
+            <p className="text-xs text-gray-500 mt-1">
+              Auto allocation: {(autoAllocationPercent * 100).toFixed(1)}%
+            </p>
+          )}
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsEditing((prev) => !prev)}
+        >
+          {isEditing ? "Close" : "Edit"}
+        </Button>
       </div>
 
-      {isGoal ? (
+      {isEditing && (
+        <BucketEditForm
+          bucket={{
+            id: bucket.id,
+            name: bucket.name,
+            targetAmount: bucket.targetAmount ?? null,
+            autoAllocationPercent: bucket.autoAllocationPercent ?? null,
+          }}
+          onCancel={() => setIsEditing(false)}
+          onSaved={() => {
+            setIsEditing(false);
+            handleRefresh();
+          }}
+        />
+      )}
+
+      {!isEditing && hasTarget ? (
         <>
           <div className="mb-4">
             <div className="flex justify-between text-sm mb-1">
               <span className="text-gray-600">Progress</span>
               <span className="font-semibold text-gray-900">
-                ${totalAllocated.toFixed(2)} / ${targetAmount.toFixed(2)}
+                ${totalAllocated.toFixed(2)} / $
+                {(targetAmountValue ?? 0).toFixed(2)}
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -111,17 +138,12 @@ export function BucketCard({
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            {hasAllocationPercent && (
-              <p className="text-xs text-gray-500 mt-2">
-                Auto allocation: {(targetPercentage * 100).toFixed(1)}%
-              </p>
-            )}
           </div>
 
           {isCompleted && (
             <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-md">
               <p className="text-sm font-medium text-green-900 mb-2">
-                ✓ Goal Reached! Congratulations!
+                ✓ Target Reached! Great work.
               </p>
               <Button
                 size="sm"
@@ -130,47 +152,24 @@ export function BucketCard({
                 disabled={isArchiving}
                 className="w-full"
               >
-                {isArchiving ? "Archiving..." : "Archive This Goal"}
+                {isArchiving ? "Archiving..." : "Archive Bucket"}
               </Button>
             </div>
           )}
-
-          <MovementForm bucketId={bucket.id} />
         </>
       ) : (
-        <>
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-600">Target</span>
-              <span className="text-lg font-bold text-gray-900">
-                {(targetPercentage * 100).toFixed(1)}%
-              </span>
+        !isEditing && (
+          <>
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Current Total</span>
+                <span className=" font-bold text-gray-900">
+                  ${totalAllocated.toFixed(2)}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Expected Monthly</span>
-              <span className="font-semibold text-gray-900">
-                ${expectedMonthly.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center mt-1">
-              <span className="text-sm text-gray-600">Current Total</span>
-              <span className="font-semibold text-gray-900">
-                ${totalAllocated.toFixed(2)}
-              </span>
-            </div>
-          </div>
-
-          {isCompleted ? (
-            <div className="mb-3 p-2 bg-green-100 border border-green-300 rounded text-sm text-green-900 text-center">
-              ✓ Complete for this month
-            </div>
-          ) : (
-            <MarkOngoingCompleteButton
-              bucketId={bucket.id}
-              amount={expectedMonthly.toFixed(2)}
-            />
-          )}
-        </>
+          </>
+        )
       )}
 
       <div className="mt-4 pt-4 border-t border-gray-200">

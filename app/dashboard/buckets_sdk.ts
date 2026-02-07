@@ -1,8 +1,7 @@
-import { getMonthTargetForTag } from "@/app/dashboard/aggregates";
 import { db } from "@/server/db";
-import { bucketMovements, buckets } from "@/server/schema";
+import { bucketMovements } from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
-import { and, count, eq, ne, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export async function getBuckets() {
   const user = await getUserWithTokenThrows();
@@ -14,38 +13,6 @@ export async function getBuckets() {
   });
   console.log("Buckets fetched:", buckets);
   return buckets;
-}
-
-export async function totalGoalBuckets() {
-  const user = await getUserWithTokenThrows();
-  const total = await db
-    .select({ count: count().as("total") })
-    .from(buckets)
-    .where(
-      and(
-        eq(buckets.type, "goal"),
-        eq(buckets.userId, user.user.id),
-        ne(buckets.isArchived, true)
-      )
-    );
-  return total[0]?.count ?? 0;
-}
-
-export async function remainingSavingsAfterOngoing() {
-  await getUserWithTokenThrows();
-  const savingsTarget = await getMonthTargetForTag("savings");
-  const buckets = await getBuckets();
-  const percentAllocated = buckets.reduce((acc, bucket) => {
-    if (bucket.isArchived || bucket.type !== "ongoing") {
-      return acc;
-    }
-    const bucketTarget = parseFloat(bucket.targetPercentage ?? "0");
-    return acc + (bucketTarget || 0);
-  }, 0);
-  if (percentAllocated >= 1) {
-    return "greater_than_100_allocated";
-  }
-  return (savingsTarget?.target ?? 0) * (1 - percentAllocated);
 }
 
 export type BucketWithMovements = Awaited<

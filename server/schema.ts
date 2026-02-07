@@ -6,7 +6,6 @@ import {
   boolean,
   primaryKey,
   uuid,
-  pgEnum,
 } from "drizzle-orm/pg-core";
 import {
   pgTable,
@@ -240,8 +239,6 @@ export const sessionTable = pgTable("session", {
   }).notNull(),
 });
 
-export const bucketTypeEnum = pgEnum("bucket_type", ["goal", "ongoing"]);
-
 export const buckets = pgTable(
   "buckets",
   {
@@ -251,9 +248,11 @@ export const buckets = pgTable(
       .references(() => userTable.id),
     name: text("name").notNull(),
     isArchived: boolean("is_archived").notNull().default(false),
-    type: bucketTypeEnum("type").notNull(), // 'goal' | 'ongoing'
-    targetAmount: decimal("target_amount", { precision: 20, scale: 2 }), // only for goal
-    targetPercentage: decimal("target_percentage", { precision: 8, scale: 4 }), // 0..1 only for ongoing
+    targetAmount: decimal("target_amount", { precision: 20, scale: 2 }),
+    autoAllocationPercent: decimal("auto_allocation_percent", {
+      precision: 8,
+      scale: 4,
+    }), // 0..1
     color: text("color"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
@@ -264,20 +263,12 @@ export const buckets = pgTable(
   },
   (t) => [
     check(
-      "targetPercent",
-      sql`(${t.targetPercentage} IS NULL OR (${t.targetPercentage} >= 0 AND ${t.targetPercentage} <= 1))`
+      "autoAllocationPercentRange",
+      sql`(${t.autoAllocationPercent} IS NULL OR (${t.autoAllocationPercent} >= 0 AND ${t.autoAllocationPercent} <= 1))`
     ),
     check(
       "targetAmountPositive",
       sql`(${t.targetAmount} IS NULL OR ${t.targetAmount} >= 0)`
-    ),
-    check(
-      "goalShape",
-      sql`((${t.type} <> 'goal') OR (${t.targetAmount} IS NOT NULL))`
-    ),
-    check(
-      "ongoingShape",
-      sql`((${t.type} <> 'ongoing') OR (${t.targetPercentage} IS NOT NULL AND ${t.targetAmount} IS NULL))`
     ),
   ]
 );

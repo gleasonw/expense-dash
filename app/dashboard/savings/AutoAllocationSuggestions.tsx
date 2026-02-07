@@ -20,9 +20,11 @@ type Suggestion = {
 export function AutoAllocationSuggestions({
   currentMonth,
   hasAllocationBuckets,
+  hasUnallocatedTransactions,
 }: {
   currentMonth: string;
   hasAllocationBuckets: boolean;
+  hasUnallocatedTransactions: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -62,42 +64,40 @@ export function AutoAllocationSuggestions({
     }
   };
 
+  if (!hasUnallocatedTransactions) {
+    return null;
+  }
+
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Auto-Allocation Suggestions</h3>
-        <div className="flex gap-2">
-          {!showSuggestions && (
-            <Button
-              onClick={handleGenerateSuggestions}
-              disabled={loading}
-              variant="outline"
-            >
-              {loading ? "Generating..." : "Generate Suggestions"}
+      <div className="flex gap-2">
+        {!showSuggestions && hasUnallocatedTransactions && (
+          <Button
+            onClick={handleGenerateSuggestions}
+            disabled={loading}
+            variant="outline"
+          >
+            {loading ? "Generating..." : "Generate Suggestions"}
+          </Button>
+        )}
+        {showSuggestions && suggestions.length > 0 && (
+          <>
+            <Button onClick={() => setShowSuggestions(false)} variant="outline">
+              Hide
             </Button>
-          )}
-          {showSuggestions && suggestions.length > 0 && (
-            <>
-              <Button
-                onClick={() => setShowSuggestions(false)}
-                variant="outline"
-              >
-                Hide
-              </Button>
-              <Button onClick={handleApplySuggestions} disabled={loading}>
-                {loading
-                  ? "Applying..."
-                  : `Apply ${suggestions.length} Suggestions`}
-              </Button>
-            </>
-          )}
-        </div>
+            <Button onClick={handleApplySuggestions} disabled={loading}>
+              {loading
+                ? "Applying..."
+                : `Apply ${suggestions.length} Suggestions`}
+            </Button>
+          </>
+        )}
       </div>
 
       {showSuggestions && suggestions.length > 0 && (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <p className="text-sm font-medium text-blue-900 mb-3">
-            Suggested allocations based on your bucket percentages:
+            Suggested allocations based on your auto-allocation percentages:
           </p>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {suggestions.map((s, idx) => (

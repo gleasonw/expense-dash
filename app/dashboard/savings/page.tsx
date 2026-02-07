@@ -1,4 +1,3 @@
-import { getMonthTargetForTag } from "@/app/dashboard/aggregates";
 import {
   getBuckets,
   getMovementsWithOrphanedStatus,
@@ -8,6 +7,7 @@ import { getUserWithTokenThrows } from "@/server/session";
 import { MonthBudgetOverview } from "./MonthBudgetOverview";
 import { UnallocatedTransactionsSection } from "./UnallocatedTransactionsSection";
 import { AutoAllocationSuggestions } from "./AutoAllocationSuggestions";
+import { AllocationPercentSummary } from "./AllocationPercentSummary";
 import { BucketForm } from "./BucketForm";
 import { BucketCard } from "./BucketCard";
 import { MonthPicker } from "@/app/dashboard/MonthPicker";
@@ -34,10 +34,9 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
   const selectedMonth = monthUTC.slice(0, 7);
 
   // Fetch all data in parallel
-  const [buckets, savingsTarget, savingsTransactions, movementsWithOrphaned] =
+  const [buckets, savingsTransactions, movementsWithOrphaned] =
     await Promise.all([
       getBuckets(),
-      getMonthTargetForTag("savings"),
       getSavingsTransactionsWithAllocations(selectedMonth),
       getMovementsWithOrphanedStatus(),
     ]);
@@ -67,12 +66,22 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
   // Filter non-archived buckets
   const activeBuckets = buckets.filter((b) => !b.isArchived);
 
-  // Group buckets by type
-  const goalBuckets = activeBuckets.filter((b) => b.type === "goal");
-  const ongoingBuckets = activeBuckets.filter((b) => b.type === "ongoing");
   const hasAllocationBuckets = activeBuckets.some(
-    (b) => parseFloat(b.targetPercentage ?? "0") > 0
+    (b) => parseFloat(b.autoAllocationPercent ?? "0") > 0
   );
+  const hasUnallocatedTransactions = savingsTransactions.some(
+    (t) => parseFloat(t.unallocatedAmount) > 0
+  );
+  const sortedBuckets = [...activeBuckets].sort((a, b) => {
+    const aHasTarget =
+      a.targetAmount !== null && parseFloat(a.targetAmount) > 0;
+    const bHasTarget =
+      b.targetAmount !== null && parseFloat(b.targetAmount) > 0;
+    if (aHasTarget === bHasTarget) {
+      return a.name.localeCompare(b.name);
+    }
+    return aHasTarget ? -1 : 1;
+  });
 
   // Map movements to buckets with orphaned status
   type MovementWithOrphaned = {
@@ -100,7 +109,7 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
             Savings Dashboard
           </h1>
           <p className="text-gray-600">
-            Track your savings goals and allocate your monthly savings
+            Track your buckets and allocate your monthly savings
           </p>
         </div>
         <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
@@ -116,11 +125,13 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
       <UnallocatedTransactionsSection
         transactions={savingsTransactions}
         buckets={activeBuckets}
-      />
-
-      <AutoAllocationSuggestions
-        currentMonth={selectedMonth}
-        hasAllocationBuckets={hasAllocationBuckets}
+        extra={
+          <AutoAllocationSuggestions
+            currentMonth={selectedMonth}
+            hasAllocationBuckets={hasAllocationBuckets}
+            hasUnallocatedTransactions={hasUnallocatedTransactions}
+          />
+        }
       />
 
       <div className="mb-6">
@@ -128,32 +139,21 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
       </div>
 
       <div className="space-y-8">
-        {goalBuckets.length > 0 && (
+        {sortedBuckets.length > 0 && (
           <div>
-            <h3 className="text-xl font-semibold mb-4">Goal Buckets</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {goalBuckets.map((bucket) => (
-                <BucketCard
-                  key={bucket.id}
-                  bucket={bucket}
-                  movements={bucketMovementsMap[bucket.id] || []}
-                  savingsTarget={savingsTarget?.target ?? 0}
-                />
-              ))}
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <h3 className="text-xl font-semibold">Buckets</h3>
+              <AllocationPercentSummary
+                buckets={sortedBuckets}
+                className="w-full max-w-xs sm:w-72"
+              />
             </div>
-          </div>
-        )}
-
-        {ongoingBuckets.length > 0 && (
-          <div>
-            <h3 className="text-xl font-semibold mb-4">Ongoing Buckets</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ongoingBuckets.map((bucket) => (
+              {sortedBuckets.map((bucket) => (
                 <BucketCard
                   key={bucket.id}
                   bucket={bucket}
                   movements={bucketMovementsMap[bucket.id] || []}
-                  savingsTarget={savingsTarget?.target ?? 0}
                 />
               ))}
             </div>

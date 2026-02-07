@@ -8,8 +8,7 @@ export function BucketForm() {
   const [formState, setFormState] = useState<Omit<PostBucket, "userId">>({
     name: "",
     targetAmount: null,
-    targetPercentage: null,
-    type: "goal",
+    autoAllocationPercent: null,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -18,17 +17,13 @@ export function BucketForm() {
     setFormState({
       name: "",
       targetAmount: null,
-      targetPercentage: null,
-      type: "goal",
+      autoAllocationPercent: null,
     });
     setFormError(null);
   }
 
   function setTargetAmount(value: string) {
     const amount = parseFloat(value);
-    if (formState.type === "ongoing") {
-      return;
-    }
     if (value.trim() === "") {
       setFormState({ ...formState, targetAmount: null });
       return;
@@ -38,32 +33,14 @@ export function BucketForm() {
     }
   }
 
-  function setTargetPercentage(value: string) {
+  function setAllocationPercent(value: string) {
     if (value.trim() === "") {
-      setFormState({ ...formState, targetPercentage: null });
+      setFormState({ ...formState, autoAllocationPercent: null });
       return;
     }
     const percent = parseFloat(value);
     if (!isNaN(percent) && percent >= 0 && percent <= 1) {
-      setFormState({ ...formState, targetPercentage: value });
-    }
-  }
-
-  function setType(type: string) {
-    if (type !== "goal" && type !== "ongoing") {
-      return;
-    }
-    switch (type) {
-      case "goal":
-        setFormState({ ...formState, type: "goal" });
-        break;
-      case "ongoing":
-        setFormState({ ...formState, targetAmount: null, type: "ongoing" });
-        break;
-      default: {
-        const _exhaustiveCheck: never = type;
-        throw new Error(`Unexpected bucket type: ${_exhaustiveCheck}`);
-      }
+      setFormState({ ...formState, autoAllocationPercent: value });
     }
   }
 
@@ -73,13 +50,23 @@ export function BucketForm() {
       onSubmit={(e) => {
         e.preventDefault();
         setFormError(null);
-        if (formState.type === "goal" && !formState.targetAmount) {
-          setFormError("Goal buckets need a target amount.");
+        if (!formState.name.trim()) {
+          setFormError("Bucket name is required.");
           return;
         }
-        if (formState.type === "ongoing" && !formState.targetPercentage) {
-          setFormError("Ongoing buckets need an allocation percentage.");
-          return;
+        if (formState.targetAmount) {
+          const amount = parseFloat(formState.targetAmount);
+          if (Number.isNaN(amount) || amount < 0) {
+            setFormError("Target amount must be a positive number.");
+            return;
+          }
+        }
+        if (formState.autoAllocationPercent) {
+          const percent = parseFloat(formState.autoAllocationPercent);
+          if (Number.isNaN(percent) || percent < 0 || percent > 1) {
+            setFormError("Auto-allocation percent must be between 0 and 1.");
+            return;
+          }
         }
         startTransition(() => {
           createBucket(formState).then((result) => {
@@ -98,33 +85,18 @@ export function BucketForm() {
         value={formState.name}
         onChange={(e) => setFormState({ ...formState, name: e.target.value })}
       />
-      <select value={formState.type} onChange={(e) => setType(e.target.value)}>
-        <option value="goal">Goal</option>
-        <option value="ongoing">Ongoing</option>
-      </select>
-      {formState.type === "goal" ? (
-        <>
-          <input
-            type="text"
-            placeholder="Target Amount"
-            value={formState.targetAmount || ""}
-            onChange={(e) => setTargetAmount(e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Allocation Percentage (optional, 0-1)"
-            value={formState.targetPercentage || ""}
-            onChange={(e) => setTargetPercentage(e.target.value)}
-          />
-        </>
-      ) : (
-        <input
-          type="text"
-          placeholder="Allocation Percentage (0-1)"
-          value={formState.targetPercentage || ""}
-          onChange={(e) => setTargetPercentage(e.target.value)}
-        />
-      )}
+      <input
+        type="text"
+        placeholder="Target Amount (optional)"
+        value={formState.targetAmount || ""}
+        onChange={(e) => setTargetAmount(e.target.value)}
+      />
+      <input
+        type="text"
+        placeholder="Auto Allocation Percent (optional, 0-1)"
+        value={formState.autoAllocationPercent || ""}
+        onChange={(e) => setAllocationPercent(e.target.value)}
+      />
       <button type="submit" className="p-2 bg-blue-500 text-white">
         {isPending ? "Creating..." : "Create Bucket"}
       </button>
