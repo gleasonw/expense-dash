@@ -14,7 +14,7 @@ import { MonthPicker } from "@/app/dashboard/MonthPicker";
 import * as dateUtils from "@/app/utils/dates";
 
 type SavingsPageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 function normalizeSearchParam(value: string | string[] | undefined): string {
@@ -27,7 +27,9 @@ function normalizeSearchParam(value: string | string[] | undefined): string {
 export default async function Savings({ searchParams }: SavingsPageProps) {
   await getUserWithTokenThrows();
 
-  const monthParam = normalizeSearchParam(searchParams?.monthUTC).trim();
+  const monthParam = normalizeSearchParam(
+    (await searchParams)?.monthUTC
+  ).trim();
   const monthUTC = dateUtils.normYyyyMm(monthParam || undefined);
   const selectedMonth = monthUTC.slice(0, 7);
 
