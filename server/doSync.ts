@@ -1,8 +1,15 @@
+import { syncTransactionContext } from "@/server/effectContext";
 import { syncUsersPlaidTransactions } from "@/server/syncPlaidTransactions";
+import { Effect } from "effect";
 
-syncUsersPlaidTransactions()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
+const runnable = Effect.provide(
+  syncUsersPlaidTransactions,
+  syncTransactionContext
+).pipe(
+  Effect.catchAll((e) => {
+    console.error("Error syncing transactions:", e);
+    return Effect.logError(e);
   })
-  .then(() => process.exit(0));
+);
+
+Effect.runFork(runnable);
