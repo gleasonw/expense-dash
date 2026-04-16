@@ -12,9 +12,7 @@ import {
 import { getUserWithTokenThrows } from "@/server/session";
 import {
   and,
-  inArray,
   eq,
-  or,
   notInArray,
   desc,
   sql,
@@ -26,6 +24,101 @@ import { cache } from "react";
 import * as R from "remeda";
 import * as dateUtils from "@/app/utils/dates";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
+
+export type TransactionWithAutoTagMatchCount = {
+  transaction_id: string;
+  name: string;
+  merchant_name?: string | null;
+  autoTagMatchCount: number;
+};
+
+function normalizeAutoTagValue(value?: string | null) {
+  return value?.trim().toLowerCase();
+}
+
+function getMatchingAutoTagsForTransaction(
+  autoTags: {
+    id: number;
+    name: string;
+    merchant_name: string | null;
+    tag_id: string;
+  }[],
+  transaction: {
+    name: string;
+    merchant_name?: string | null | undefined;
+  }
+) {
+  const normalizedName = normalizeAutoTagValue(transaction.name);
+  const normalizedMerchantName = normalizeAutoTagValue(transaction.merchant_name);
+
+  return autoTags.filter((autoTag) => {
+    const ruleName = normalizeAutoTagValue(autoTag.name);
+    const ruleMerchantName = normalizeAutoTagValue(autoTag.merchant_name);
+    if (!ruleName) {
+      return false;
+    }
+
+    const nameMatches = normalizedName === ruleName;
+    const merchantMatches = !!ruleMerchantName
+      ? normalizedMerchantName === ruleMerchantName
+      : true;
+    return nameMatches && merchantMatches;
+  });
+}
+
+function getPreferredAutoTag(
+  matches: {
+    id: number;
+    name: string;
+    merchant_name: string | null;
+    tag_id: string;
+  }[]
+) {
+  if (matches.length === 0) {
+    return undefined;
+  }
+
+  return matches
+    .slice()
+    .sort((a, b) => {
+      const specificityDiff =
+        Number(!!b.merchant_name) - Number(!!a.merchant_name);
+      if (specificityDiff !== 0) {
+        return specificityDiff;
+      }
+      return a.id - b.id;
+    })[0];
+}
+
+export async function getAutoTagMatchCountsForTransactions(
+  transactionsToInspect: {
+    transaction_id: string;
+    name: string;
+    merchant_name?: string | null;
+  }[],
+  user: User
+) {
+  if (transactionsToInspect.length === 0) {
+    return {};
+  }
+
+  const candidateAutoTags = await db
+    .select()
+    .from(auto_tag_merchants_new)
+    .where(eq(auto_tag_merchants_new.user_id, user.id));
+
+  return transactionsToInspect.reduce(
+    (acc, transaction) => {
+      const matches = getMatchingAutoTagsForTransaction(
+        candidateAutoTags,
+        transaction
+      );
+      acc[transaction.transaction_id] = matches.length;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+}
 
 /**developer utility, helpful when booting up a new deployment */
 export async function tagAllAsFirstTag() {
@@ -105,34 +198,18 @@ export async function autoTagTransactionsForUser(
   }[],
   user: User
 ) {
+  if (ts.length === 0) {
+    return;
+  }
+
   const autoTags = await db
     .select()
     .from(auto_tag_merchants_new)
-    .where(
-      and(
-        or(
-          inArray(
-            auto_tag_merchants_new.name,
-            ts.map((t) => t.name)
-          ),
-          inArray(
-            auto_tag_merchants_new.merchant_name,
-            ts.map((t) => t.merchant_name ?? "")
-          )
-        ),
-        eq(auto_tag_merchants_new.user_id, user.id)
-      )
-    );
+    .where(eq(auto_tag_merchants_new.user_id, user.id));
 
-  const autoTagsByName = R.indexBy(autoTags, (at) => at.name);
-  const autoTagsByMerchantName = R.indexBy(
-    autoTags,
-    (at) => at.merchant_name ?? ""
-  );
   const transactionsToAutotag = ts.reduce((acc, t) => {
-    const autoTag =
-      autoTagsByName[t.name] ??
-      (t.merchant_name ? autoTagsByMerchantName[t.merchant_name] : undefined);
+    const matches = getMatchingAutoTagsForTransaction(autoTags, t);
+    const autoTag = getPreferredAutoTag(matches);
     if (!autoTag) {
       return acc;
     }
@@ -181,7 +258,7 @@ export async function autoTagTransactions(
 
 export const getTransactionsWithTags = cache(
   async (filters?: { tag?: string; monthUTC?: dateUtils.YyyyMm }) => {
-    await getUserWithTokenThrows();
+    const user = await getUserWithTokenThrows();
     const filterConditions = getFilterConditions(filters);
     if (filters?.tag) {
       filterConditions.push(eq(tags_new.tag, filters.tag));
@@ -197,7 +274,7 @@ export const getTransactionsWithTags = cache(
       .where(and(...filterConditions))
       .orderBy(desc(transactions.date), transactions.merchant_name);
 
-    return Object.values(
+    const mergedTransactions = Object.values(
       R.groupBy(ts, (t) => t.transactions.transaction_id)
     ).map((tagsForTransaction) => {
       const baseTransaction = tagsForTransaction[0].transactions;
@@ -209,6 +286,20 @@ export const getTransactionsWithTags = cache(
         tags,
       };
     });
+
+    const autoTagMatchCounts = await getAutoTagMatchCountsForTransactions(
+      mergedTransactions.map((transaction) => ({
+        transaction_id: transaction.transaction_id,
+        name: transaction.name,
+        merchant_name: transaction.merchant_name,
+      })),
+      user.user
+    );
+
+    return mergedTransactions.map((transaction) => ({
+      ...transaction,
+      autoTagMatchCount: autoTagMatchCounts[transaction.transaction_id] ?? 0,
+    }));
   }
 );
 

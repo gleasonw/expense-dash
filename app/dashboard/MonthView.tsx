@@ -21,6 +21,7 @@ import { lowestTagForString, tagsByParent } from "@/app/dashboard/tag_utils";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { Tag, TransactionWithTags } from "@/server/schema";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
+import { TransactionWithAutoTagMatchCount } from "@/app/dashboard/transactions_sdk";
 
 export async function MonthView({
   monthUTC,
@@ -31,7 +32,7 @@ export async function MonthView({
 }: {
   monthUTC: dateUtils.YyyyMm;
   filterByTag?: string;
-  tsMerged: TransactionWithTags[];
+  tsMerged: Array<TransactionWithTags & TransactionWithAutoTagMatchCount>;
   allTags: Tag[];
   netSpendForSelectedMonth?: {
     month: string;
@@ -135,6 +136,14 @@ export async function MonthView({
                   </RemoveTagButton>
                 ))}
               <AddTagInput tags={allTags} transaction={t} />
+              <button
+                type="button"
+                className="rounded-full border border-gray-300 px-2 py-1 text-xs text-gray-600"
+                title={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
+                aria-label={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
+              >
+                Auto {t.autoTagMatchCount}
+              </button>
               <div className="ml-auto">
                 <TransactionDateEditor
                   date={new Date(t.date)}
