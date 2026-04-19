@@ -201,11 +201,20 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
   });
 
   const tags = await allUserTags();
+  const totalAllocatedPercent = toTrack.reduce((total, tag) => {
+    if (!tag.tagAllocation || !tag.tag_id) {
+      return total;
+    }
+
+    return total + parseFloat(tag.tagAllocation);
+  }, 0);
+  const remainingPercent = 100 - totalAllocatedPercent;
+
   return (
     <div className="flex flex-col gap-5 w-full">
       <AllocationEditContext>
         <div className="flex justify-between items-center">
-          <CreateAllocationForm tags={tags} />
+          <CreateAllocationForm tags={tags} remainingPercent={remainingPercent} />
           <AllocationEditButton />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -285,7 +294,7 @@ async function TagAllocation({
 
   const { income } = R.groupBy(estimatedIncomeAndExpenses, (r) => r.tag);
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
-  const allocation = parseInt(tagSpending?.tagAllocation ?? "0", 10);
+  const allocation = parseFloat(tagSpending?.tagAllocation ?? "0");
   const targetSpending = (allocation / 100) * estIncome;
   const netAmount = targetSpending - Number(tagSpending.amount);
 
@@ -294,7 +303,12 @@ async function TagAllocation({
       <div key={tagSpending.tag_id} className="w-full flex gap-3">
         <div className="flex-col gap-3 w-full flex">
           {/* Tag name */}
-          <div className="text-lg font-semibold">{tagSpending.tag}</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-lg font-semibold">{tagSpending.tag}</div>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              {allocation.toFixed(2)}% allocation
+            </span>
+          </div>
 
           {/* Progress bar */}
           <div className="w-full h-4 overflow-hidden border rounded bg-gray-100">

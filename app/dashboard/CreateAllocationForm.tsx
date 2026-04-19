@@ -6,12 +6,19 @@ import { useState } from "react";
 
 export function CreateAllocationForm({
   tags,
+  remainingPercent,
 }: {
   tags: Array<{ id: string; tag: string }>;
+  remainingPercent: number;
 }) {
   const [show, setShow] = useState(false);
   const [tagId, setTagId] = useState("");
   const [allocation, setAllocation] = useState("");
+  const allocationValue = parseFloat(allocation);
+  const isValidAllocation = !Number.isNaN(allocationValue);
+  const remainingAfterInput = isValidAllocation
+    ? remainingPercent - allocationValue
+    : remainingPercent;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,6 +79,11 @@ export function CreateAllocationForm({
             className="border rounded p-2"
             required
           />
+          <span className="mt-1 text-xs text-gray-500">
+            {isValidAllocation
+              ? `${remainingAfterInput.toFixed(2)}% remaining after this allocation`
+              : `${remainingPercent.toFixed(2)}% remaining from 100%`}
+          </span>
         </label>
 
         <Button
