@@ -12,6 +12,7 @@ import {
 import { getUserWithTokenThrows } from "@/server/session";
 import {
   and,
+  asc,
   eq,
   notInArray,
   desc,
@@ -257,12 +258,23 @@ export async function autoTagTransactions(
 }
 
 export const getTransactionsWithTags = cache(
-  async (filters?: { tag?: string; monthUTC?: dateUtils.YyyyMm }) => {
+  async (filters?: {
+    tag?: string;
+    monthUTC?: dateUtils.YyyyMm;
+    amountSort?: "asc" | "desc";
+  }) => {
     const user = await getUserWithTokenThrows();
     const filterConditions = getFilterConditions(filters);
     if (filters?.tag) {
       filterConditions.push(eq(tags_new.tag, filters.tag));
     }
+    const amountOrderBy =
+      filters?.amountSort === "asc"
+        ? asc(sql`CAST(${transactions.amount} AS NUMERIC)`)
+        : filters?.amountSort === "desc"
+          ? desc(sql`CAST(${transactions.amount} AS NUMERIC)`)
+          : undefined;
+
     const ts = await db
       .select()
       .from(transactions)
@@ -272,7 +284,11 @@ export const getTransactionsWithTags = cache(
       )
       .leftJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
       .where(and(...filterConditions))
-      .orderBy(desc(transactions.date), transactions.merchant_name);
+      .orderBy(
+        ...(amountOrderBy
+          ? [amountOrderBy, desc(transactions.date), transactions.merchant_name]
+          : [desc(transactions.date), transactions.merchant_name])
+      );
 
     const mergedTransactions = Object.values(
       R.groupBy(ts, (t) => t.transactions.transaction_id)
