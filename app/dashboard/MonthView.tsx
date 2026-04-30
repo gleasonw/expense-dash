@@ -14,6 +14,7 @@ import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { AddTagInput, RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
 import clsx from "clsx";
 import { FilterByTagDropdown } from "@/app/dashboard/FilterByTagDropdown";
+import { TransactionAmountSortDropdown } from "@/app/dashboard/TransactionAmountSortDropdown";
 import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
 import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
 import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
@@ -26,12 +27,14 @@ import { TransactionWithAutoTagMatchCount } from "@/app/dashboard/transactions_s
 export async function MonthView({
   monthUTC,
   filterByTag,
+  amountSort,
   tsMerged,
   allTags,
   netSpendForSelectedMonth,
 }: {
   monthUTC: dateUtils.YyyyMm;
   filterByTag?: string;
+  amountSort?: "asc" | "desc";
   tsMerged: Array<TransactionWithTags & TransactionWithAutoTagMatchCount>;
   allTags: Tag[];
   netSpendForSelectedMonth?: {
@@ -114,7 +117,7 @@ export async function MonthView({
         <SpendingTargets monthUTC={monthUTC} />
       </FeatureBox>
       <FeatureBox className="flex flex-col w-full">
-        <TransactionFilters selectedTag={filterByTag} />
+        <TransactionFilters selectedTag={filterByTag} amountSort={amountSort} />
         {tsMerged.map((t) => (
           <div
             key={t.transaction_id}
@@ -158,7 +161,13 @@ export async function MonthView({
   );
 }
 
-async function TransactionFilters({ selectedTag }: { selectedTag?: string }) {
+async function TransactionFilters({
+  selectedTag,
+  amountSort,
+}: {
+  selectedTag?: string;
+  amountSort?: "asc" | "desc";
+}) {
   const user = await getUserWithTokenThrows();
   const userTags = await db.query.tags_new.findMany({
     where: eq(tags_new.userId, user.user.id),
@@ -175,6 +184,7 @@ async function TransactionFilters({ selectedTag }: { selectedTag?: string }) {
         ]}
         selectedValue={selectedTag ?? ""}
       />
+      <TransactionAmountSortDropdown selectedValue={amountSort} />
     </div>
   );
 }

@@ -21,6 +21,9 @@ export default async function Dashboard({
   const params = await searchParams;
   const view = (params.view as string) ?? "month";
   const filterByTag = params.tag as string | undefined;
+  const amountSort = params.amountSort as string | undefined;
+  const validatedAmountSort =
+    amountSort === "asc" || amountSort === "desc" ? amountSort : undefined;
 
   // Fetch tags (needed for both views)
   const allTags = await allUserTags();
@@ -104,7 +107,11 @@ export default async function Dashboard({
 
   const [tsMerged, netSpendForMonth, spendingLast5Months, testAllNetSpend] =
     await Promise.all([
-      getTransactionsWithTags({ tag: filterByTag, monthUTC }),
+      getTransactionsWithTags({
+        tag: filterByTag,
+        monthUTC,
+        amountSort: validatedAmountSort,
+      }),
       getNetSpendingByMonth({ monthUTC }),
       monthSpending({
         forPastXMonths: 3,
@@ -124,6 +131,7 @@ export default async function Dashboard({
       <MonthView
         monthUTC={monthUTC}
         filterByTag={filterByTag}
+        amountSort={validatedAmountSort}
         tsMerged={tsMerged}
         allTags={allTags}
         netSpendForSelectedMonth={netSpendForSelectedMonth}
