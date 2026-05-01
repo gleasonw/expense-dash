@@ -17,7 +17,7 @@ import { FilterByTagDropdown } from "@/app/dashboard/FilterByTagDropdown";
 import { TransactionAmountSortDropdown } from "@/app/dashboard/TransactionAmountSortDropdown";
 import { AllocationEditContext } from "@/app/dashboard/AllocationEditContext";
 import { AllocationEditButton } from "@/app/dashboard/AllocationEditButton";
-import { AllocationDeleteButton } from "@/app/dashboard/AllocationDeleteButton";
+import { AllocationEditControls } from "@/app/dashboard/AllocationEditControls";
 import { lowestTagForString, tagsByParent } from "@/app/dashboard/tag_utils";
 import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { Tag, TransactionWithTags } from "@/server/schema";
@@ -363,8 +363,11 @@ async function TagAllocation({
             </div>
           </div>
         </div>
-        {tagSpending.tag_id && (
-          <AllocationDeleteButton tagId={tagSpending.tag_id} />
+        {tagSpending.tag_id && tagSpending.tagAllocation && (
+          <AllocationEditControls
+            tagId={tagSpending.tag_id}
+            initialAllocation={tagSpending.tagAllocation}
+          />
         )}
       </div>
       <div className="flex flex-col ">

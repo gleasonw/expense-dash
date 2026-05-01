@@ -41,6 +41,23 @@ export async function createAllocationForTag(
   return result;
 }
 
+export async function updateAllocationForTag(tagId: string, allocation: string) {
+  const user = await getUserWithTokenThrows();
+  await db
+    .insert(tagAllocationsNew)
+    .values({
+      tag_id: tagId,
+      allocation,
+      user_id: user.user.id,
+    })
+    .onConflictDoUpdate({
+      target: [tagAllocationsNew.user_id, tagAllocationsNew.tag_id],
+      set: { allocation: sql`excluded.allocation` },
+    });
+  revalidatePath(`/dashboard`);
+  return;
+}
+
 export async function deleteAllocationForTag(tagId: string) {
   const user = await getUserWithTokenThrows();
   await db
