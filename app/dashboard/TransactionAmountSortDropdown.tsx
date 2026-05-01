@@ -32,7 +32,9 @@ export function TransactionAmountSortDropdown({
         }
 
         const queryString = params.toString();
-        router.push(queryString ? `${pathname}?${queryString}` : pathname);
+        router.push(queryString ? `${pathname}?${queryString}` : pathname, {
+          scroll: false,
+        });
       }}
       value={selectedValue ?? DEFAULT_SORT}
     >
