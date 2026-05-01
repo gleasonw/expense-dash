@@ -37,9 +37,15 @@ export function FilterByTagDropdown({
           params.set("tag", value);
         }
         const queryString = params.toString();
-        router.push(queryString ? `${pathname}?${queryString}` : pathname);
+        router.push(queryString ? `${pathname}?${queryString}` : pathname, {
+          scroll: false,
+        });
       }}
-      value={selectedValue && selectedValue.length > 0 ? selectedValue : ALL_TAG_VALUE}
+      value={
+        selectedValue && selectedValue.length > 0
+          ? selectedValue
+          : ALL_TAG_VALUE
+      }
     >
       <SelectTrigger className="w-[220px]">
         <SelectValue placeholder="Filter by tag" />
