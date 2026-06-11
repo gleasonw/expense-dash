@@ -1,6 +1,7 @@
 "use client";
 
 import { createAllocationForTag } from "@/app/dashboard/tag_actions";
+import type { TagAllocationType } from "@/app/dashboard/tag_actions";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -14,16 +15,18 @@ export function CreateAllocationForm({
   const [show, setShow] = useState(false);
   const [tagId, setTagId] = useState("");
   const [allocation, setAllocation] = useState("");
+  const [allocationType, setAllocationType] =
+    useState<TagAllocationType>("percent");
   const allocationValue = parseFloat(allocation);
   const isValidAllocation = !Number.isNaN(allocationValue);
-  const remainingAfterInput = isValidAllocation
+  const remainingAfterInput = isValidAllocation && allocationType === "percent"
     ? remainingPercent - allocationValue
     : remainingPercent;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!tagId || !allocation) return;
-    createAllocationForTag({ tag_id: tagId, allocation });
+    createAllocationForTag({ tag_id: tagId, allocation, allocationType });
   }
 
   if (!show) {
@@ -70,7 +73,23 @@ export function CreateAllocationForm({
         </label>
 
         <label className="flex flex-col">
-          <span className="mb-1 font-medium">Allocation</span>
+          <span className="mb-1 font-medium">Allocation Type</span>
+          <select
+            value={allocationType}
+            onChange={(e) =>
+              setAllocationType(e.target.value as TagAllocationType)
+            }
+            className="border rounded p-2"
+          >
+            <option value="percent">Percent of income</option>
+            <option value="fixed">Fixed amount</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col">
+          <span className="mb-1 font-medium">
+            {allocationType === "fixed" ? "Amount" : "Allocation"}
+          </span>
           <input
             type="number"
             step="0.01"
@@ -80,9 +99,11 @@ export function CreateAllocationForm({
             required
           />
           <span className="mt-1 text-xs text-gray-500">
-            {isValidAllocation
-              ? `${remainingAfterInput.toFixed(2)}% remaining after this allocation`
-              : `${remainingPercent.toFixed(2)}% remaining from 100%`}
+            {allocationType === "fixed"
+              ? "Fixed monthly budget amount"
+              : isValidAllocation
+                ? `${remainingAfterInput.toFixed(2)}% remaining after this allocation`
+                : `${remainingPercent.toFixed(2)}% remaining from 100%`}
           </span>
         </label>
 

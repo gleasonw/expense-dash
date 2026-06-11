@@ -133,6 +133,10 @@ export const tagAllocationsNew = pgTable(
       .notNull()
       .references(() => tags_new.id),
     allocation: decimal("allocation").notNull(),
+    allocationType: varchar("allocation_type", { length: 16 })
+      .$type<"percent" | "fixed">()
+      .notNull()
+      .default("percent"),
   },
   (table) => [primaryKey({ columns: [table.user_id, table.tag_id] })]
 );

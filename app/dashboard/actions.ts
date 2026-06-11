@@ -159,12 +159,16 @@ export async function setTagAllocation(formData: FormData) {
       allocations.map((a) => ({
         tag_id: a.tagId,
         allocation: a.allocation as string,
+        allocationType: "percent" as const,
         user_id: user.user.id,
       }))
     )
     .onConflictDoUpdate({
       target: [tagAllocationsNew.user_id, tagAllocationsNew.tag_id],
-      set: { allocation: sql`excluded.allocation` },
+      set: {
+        allocation: sql`excluded.allocation`,
+        allocationType: sql`excluded.allocation_type`,
+      },
     });
   revalidatePath("/dashboard");
 }

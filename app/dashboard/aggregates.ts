@@ -55,8 +55,10 @@ export async function getMonthTargetForTag(tag: string) {
 
   const tagAllocation = await db.query.tagAllocationsNew.findFirst({
     where: (tagAllocationsNew, { eq }) =>
-      eq(tagAllocationsNew.tag_id, fullTag.id) &&
-      eq(tagAllocationsNew.user_id, user.user.id),
+      and(
+        eq(tagAllocationsNew.tag_id, fullTag.id),
+        eq(tagAllocationsNew.user_id, user.user.id)
+      ),
   });
 
   if (!tagAllocation) {
@@ -64,13 +66,17 @@ export async function getMonthTargetForTag(tag: string) {
     return null;
   }
 
-  const allocationPercent = parseFloat(tagAllocation.allocation) / 100;
+  const allocationValue = parseFloat(tagAllocation.allocation);
+  const target =
+    tagAllocation.allocationType === "fixed"
+      ? allocationValue
+      : (lastMonthIncome ?? 0) * (allocationValue / 100) * -1;
 
   return {
     fullTag,
     lastMonthIncome,
     tagAllocation,
-    target: (lastMonthIncome ?? 0) * allocationPercent * -1,
+    target,
   };
 }
 
@@ -85,6 +91,7 @@ export type SpendingRow = {
   tag_id: string | null;
   color: string | null;
   tagAllocation: string | null;
+  tagAllocationType: "percent" | "fixed" | null;
   depth: number;
 };
 
@@ -177,13 +184,14 @@ export function monthSpending({
         tag_id: sql<string | null>`t.id`,
         color: sql<string | null>`t.color`,
         tagAllocation: sql<string | null>`tag_allocations_new.allocation`,
+        tagAllocationType: sql<"percent" | "fixed" | null>`tag_allocations_new.allocation_type`,
         depth: sql<number>`MIN(a.depth)`,
       })
       .from(sql`ancestors a`)
       .leftJoin(T, eq(sql`a.bucket_tag`, sql`t.tag`))
       .leftJoin(tagAllocationsNew, eq(tagAllocationsNew.tag_id, sql`t.id`))
       .groupBy(
-        sql`a.month, a.bucket_tag, t.id, t.color, tag_allocations_new.allocation`
+        sql`a.month, a.bucket_tag, t.id, t.color, tag_allocations_new.allocation, tag_allocations_new.allocation_type`
       )
       .having(sql`MIN(a.depth) <= ${atDepth ?? 100}`)
       .orderBy(sql`a.month, a.bucket_tag`);

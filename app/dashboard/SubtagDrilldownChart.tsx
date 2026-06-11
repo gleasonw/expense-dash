@@ -8,7 +8,9 @@ import { SpendingRow } from "@/app/dashboard/aggregates";
 import { lowestTagForString } from "@/app/dashboard/tag_utils";
 
 type SubtagDrilldownChartProps = {
-  subtagData: Array<Omit<SpendingRow, "depth" | "tagAllocation">>;
+  subtagData: Array<
+    Omit<SpendingRow, "depth" | "tagAllocation" | "tagAllocationType">
+  >;
   parentTag: string;
 };
 

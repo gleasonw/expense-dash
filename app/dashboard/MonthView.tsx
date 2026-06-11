@@ -1,6 +1,11 @@
 import { SpendingCategorizer } from "@/app/dashboard/SpendingCategorizer";
 import { db } from "@/server/db";
-import { tags_new, tagsLinkNew, transactions } from "@/server/schema";
+import {
+  tagAllocationsNew,
+  tags_new,
+  tagsLinkNew,
+  transactions,
+} from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
 import { and, eq, sql } from "drizzle-orm";
 import * as R from "remeda";
@@ -192,7 +197,9 @@ async function TransactionFilters({
 }
 
 async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
+  const user = await getUserWithTokenThrows();
   const allocations = await db.query.tagAllocationsNew.findMany({
+    where: eq(tagAllocationsNew.user_id, user.user.id),
     with: {
       tag: true,
     },
@@ -217,12 +224,12 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
   });
 
   const tags = await allUserTags();
-  const totalAllocatedPercent = toTrack.reduce((total, tag) => {
-    if (!tag.tagAllocation || !tag.tag_id) {
+  const totalAllocatedPercent = allocations.reduce((total, allocation) => {
+    if (allocation.allocationType !== "percent") {
       return total;
     }
 
-    return total + parseFloat(tag.tagAllocation);
+    return total + parseFloat(allocation.allocation);
   }, 0);
   const remainingPercent = 100 - totalAllocatedPercent;
   const spendingForTag = R.indexBy(
@@ -257,12 +264,11 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
                 tagSpending={tagSpending.parent}
               >
                 {tagSpending.children.map((childTagSpending) => (
-                  <TagChild key={childTagSpending.tag_id}>
-                    <TagAllocation
-                      monthUTC={monthUTC}
-                      tagSpending={childTagSpending}
-                    />
-                  </TagChild>
+                  <TagAllocation
+                    key={childTagSpending.tag_id}
+                    monthUTC={monthUTC}
+                    tagSpending={childTagSpending}
+                  />
                 ))}
               </TagAllocation>
             );
@@ -278,6 +284,7 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
                 depth: 0,
                 tag: allocation.tag.tag,
                 tagAllocation: allocation.allocation,
+                tagAllocationType: allocation.allocationType,
                 tag_id: allocation.tag_id,
               }}
             />
@@ -286,10 +293,6 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
       </AllocationEditContext>
     </div>
   );
-}
-
-function TagChild({ children }: { children: React.ReactNode }) {
-  return <div className="opacity-50 odd:bg-gray-100 py-1">{children}</div>;
 }
 
 async function TagAllocation({
@@ -321,10 +324,17 @@ async function TagAllocation({
     );
   }
 
+  const isRootAllocation = tagSpending.depth === 1;
+
   if (!tagSpending.tagAllocation) {
     return (
       <div className="">
-        <div className={`flex gap-2 w-full justify-between`}>
+        <div
+          className={clsx("flex w-full justify-between gap-2", {
+            "text-base font-medium": isRootAllocation,
+            "text-sm text-gray-600": !isRootAllocation,
+          })}
+        >
           <span>{lowestTagForString(tagSpending.tag)}</span>
           <span>${tagSpending.amount}</span>
         </div>
@@ -342,28 +352,52 @@ async function TagAllocation({
   const { income } = R.groupBy(estimatedIncomeAndExpenses, (r) => r.tag);
   const estIncome = parseInt(income?.[0].amount ?? "0", 10) * -1;
   const allocation = parseFloat(tagSpending?.tagAllocation ?? "0");
-  const targetSpending = (allocation / 100) * estIncome;
+  const allocationType = tagSpending.tagAllocationType ?? "percent";
+  const targetSpending =
+    allocationType === "fixed" ? allocation : (allocation / 100) * estIncome;
   const netAmount = targetSpending - Number(tagSpending.amount);
+  const progressPercent =
+    targetSpending > 0
+      ? Math.min((Number(tagSpending.amount) / targetSpending) * 100, 100)
+      : 0;
 
   return (
-    <div className="flex flex-col gap-4 border border-gray-200 rounded-lg p-4 bg-white shadow-md">
+    <div
+      className={clsx("flex flex-col gap-4 rounded-lg p-4 bg-white", {
+        "border border-gray-200 shadow-md": isRootAllocation,
+      })}
+    >
       <div key={tagSpending.tag_id} className="w-full flex gap-3">
         <div className="flex-col gap-3 w-full flex">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-lg font-semibold">{tagSpending.tag}</div>
+            <div
+              className={clsx({
+                "text-lg font-semibold": isRootAllocation,
+                "text-base font-medium text-gray-700": !isRootAllocation,
+              })}
+            >
+              {tagSpending.tag}
+            </div>
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-              {allocation.toFixed(2)}% allocation
+              {allocationType === "fixed"
+                ? `$${Math.round(allocation)} fixed`
+                : `${allocation.toFixed(2)}% allocation`}
             </span>
           </div>
 
-          <div className="w-full h-4 overflow-hidden border rounded bg-gray-100">
+          <div
+            className={clsx(
+              "w-full overflow-hidden border rounded bg-gray-100",
+              {
+                "h-4": isRootAllocation,
+                "h-2": !isRootAllocation,
+              }
+            )}
+          >
             <div
               className={`relative h-full bg-${tagSpending.color}-400`}
               style={{
-                width: `${Math.min(
-                  (Number(tagSpending.amount) / targetSpending) * 100,
-                  100
-                )}%`,
+                width: `${progressPercent}%`,
               }}
             ></div>
           </div>
@@ -373,13 +407,23 @@ async function TagAllocation({
               <span className="text-xs text-gray-500 font-medium">
                 Budgeted
               </span>
-              <span className="text-lg text-gray-900">
+              <span
+                className={clsx("text-gray-900", {
+                  "text-lg": isRootAllocation,
+                  "text-base": !isRootAllocation,
+                })}
+              >
                 ${Math.round(targetSpending)}
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 font-medium">Spent</span>
-              <span className="text-lg text-gray-900">
+              <span
+                className={clsx("text-gray-900", {
+                  "text-lg": isRootAllocation,
+                  "text-base": !isRootAllocation,
+                })}
+              >
                 ${Math.abs(Number(tagSpending.amount))}
               </span>
             </div>
@@ -388,9 +432,12 @@ async function TagAllocation({
                 Remaining
               </span>
               <span
-                className={`text-lg font-bold ${
-                  netAmount >= 0 ? "text-green-600" : "text-red-600"
-                }`}
+                className={clsx("font-bold", {
+                  "text-lg": isRootAllocation,
+                  "text-base": !isRootAllocation,
+                  "text-green-600": netAmount >= 0,
+                  "text-red-600": netAmount < 0,
+                })}
               >
                 ${Math.round(Math.abs(netAmount))}
               </span>
@@ -401,16 +448,17 @@ async function TagAllocation({
           <AllocationEditControls
             tagId={tagSpending.tag_id}
             initialAllocation={tagSpending.tagAllocation}
+            initialAllocationType={tagSpending.tagAllocationType ?? "percent"}
           />
         )}
       </div>
       <div className="flex flex-col ">
-        {tagSpending.depth === 1 ? (
-          <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
-        ) : null}
-
-        {/* Breakdown section */}
-        {children}
+        <div className="pl-10">
+          {children}
+          {tagSpending.depth === 1 ? (
+            <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -455,12 +503,12 @@ async function RootSpendingForTag({
     return null;
   }
   return (
-    <TagChild>
-      <div className="flex gap-2 w-full justify-between">
+    <div className="border-t border-gray-100 px-1 py-2 text-sm text-gray-500">
+      <div className="flex w-full justify-between gap-2">
         <span>unbound</span>
         <span>${baseSpend.amount}</span>
       </div>
-    </TagChild>
+    </div>
   );
 }
 

@@ -7,7 +7,9 @@ import "./highcharts.css";
 import { SpendingRow } from "@/app/dashboard/aggregates";
 
 type SpendingChartProps = {
-  discretionaryByMonth: Array<Omit<SpendingRow, "depth" | "tagAllocation">>;
+  discretionaryByMonth: Array<
+    Omit<SpendingRow, "depth" | "tagAllocation" | "tagAllocationType">
+  >;
 };
 
 export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {

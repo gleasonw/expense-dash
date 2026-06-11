@@ -11,6 +11,31 @@ import { getUserWithTokenThrows } from "@/server/session";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+export type TagAllocationType = "percent" | "fixed";
+
+type TagAllocationInput = {
+  tag_id: string;
+  allocation: string;
+  allocationType?: TagAllocationType;
+};
+
+function cleanAllocationInput({
+  tag_id,
+  allocation,
+  allocationType = "percent",
+}: TagAllocationInput): TagAllocationInput {
+  const numericAllocation = Number(allocation);
+  if (!tag_id || !Number.isFinite(numericAllocation) || numericAllocation < 0) {
+    throw new Error("Invalid allocation");
+  }
+
+  if (allocationType !== "percent" && allocationType !== "fixed") {
+    throw new Error("Invalid allocation type");
+  }
+
+  return { tag_id, allocation, allocationType };
+}
+
 export async function updateTag(tag: UpdateTag) {
   const user = await getUserWithTokenThrows();
   if (user.user.id !== tag.userId) {
@@ -27,32 +52,57 @@ export async function updateTag(tag: UpdateTag) {
 }
 
 export async function createAllocationForTag(
-  upsertTag: Omit<TagAllocationUpsert, "user_id">
+  upsertTag: Omit<TagAllocationUpsert, "user_id" | "allocationType"> & {
+    allocationType?: TagAllocationType;
+  }
 ) {
   const user = await getUserWithTokenThrows();
+  const allocation = cleanAllocationInput(upsertTag);
   const result = await db
     .insert(tagAllocationsNew)
     .values({
-      ...upsertTag,
+      ...allocation,
       user_id: user.user.id,
+    })
+    .onConflictDoUpdate({
+      target: [tagAllocationsNew.user_id, tagAllocationsNew.tag_id],
+      set: {
+        allocation: sql`excluded.allocation`,
+        allocationType: sql`excluded.allocation_type`,
+      },
     })
     .returning();
   revalidatePath(`/dashboard`);
   return result;
 }
 
-export async function updateAllocationForTag(tagId: string, allocation: string) {
+export async function updateAllocationForTag({
+  tagId,
+  allocation,
+  allocationType,
+}: {
+  tagId: string;
+  allocation: string;
+  allocationType: TagAllocationType;
+}) {
   const user = await getUserWithTokenThrows();
+  const cleanAllocation = cleanAllocationInput({
+    tag_id: tagId,
+    allocation,
+    allocationType,
+  });
   await db
     .insert(tagAllocationsNew)
     .values({
-      tag_id: tagId,
-      allocation,
+      ...cleanAllocation,
       user_id: user.user.id,
     })
     .onConflictDoUpdate({
       target: [tagAllocationsNew.user_id, tagAllocationsNew.tag_id],
-      set: { allocation: sql`excluded.allocation` },
+      set: {
+        allocation: sql`excluded.allocation`,
+        allocationType: sql`excluded.allocation_type`,
+      },
     });
   revalidatePath(`/dashboard`);
   return;
