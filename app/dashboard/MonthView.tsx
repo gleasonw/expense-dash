@@ -365,8 +365,6 @@ async function TagAllocation({
     return (
       <SubcategoryAllocationView
         tagSpending={tagSpending}
-        allocation={allocation}
-        allocationType={allocationType}
         targetSpending={targetSpending}
         netAmount={netAmount}
       >
@@ -479,15 +477,11 @@ async function TagAllocation({
 function SubcategoryAllocationView({
   tagSpending,
   children,
-  allocation,
-  allocationType,
   targetSpending,
   netAmount,
 }: {
   tagSpending: SpendingRow;
   children?: React.ReactNode;
-  allocation: number;
-  allocationType: "percent" | "fixed";
   targetSpending: number;
   netAmount: number;
 }) {

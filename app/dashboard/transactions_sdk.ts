@@ -264,10 +264,10 @@ export const getTransactionsWithTags = cache(
     amountSort?: "asc" | "desc";
   }) => {
     const user = await getUserWithTokenThrows();
-    const filterConditions = getFilterConditions(filters);
-    if (filters?.tag) {
-      filterConditions.push(eq(tags_new.tag, filters.tag));
-    }
+    const filterConditions = getFilterConditions({
+      monthUTC: filters?.monthUTC,
+      includeTag: filters?.tag,
+    });
     const amountOrderBy =
       filters?.amountSort === "asc"
         ? asc(sql`CAST(${transactions.amount} AS NUMERIC)`)

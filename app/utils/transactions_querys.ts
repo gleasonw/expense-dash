@@ -2,6 +2,30 @@ import * as dateUtils from "@/app/utils/dates";
 import { db } from "@/server/db";
 import { tags_new, tagsLinkNew, transactions } from "@/server/schema";
 import { and, eq, exists, gte, inArray, lt, notExists, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
+
+export function tagMatchesSubtree(tagColumn: AnyPgColumn, tag: string) {
+  return sql`(${tagColumn} = ${tag} OR ${tagColumn} LIKE ${tag + "/"} || '%')`;
+}
+
+export function tagExcludesSubtree(tagColumn: AnyPgColumn, tag: string) {
+  return sql`NOT (${tagMatchesSubtree(tagColumn, tag)})`;
+}
+
+export function tagFilter(tag: string) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(tagsLinkNew)
+      .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
+      .where(
+        and(
+          eq(tagsLinkNew.transaction_id, transactions.transaction_id),
+          tagMatchesSubtree(tags_new.tag, tag)
+        )
+      )
+  );
+}
 
 /** filters expected to apply directly onto the transactions table */
 export function getFilterConditions(
@@ -23,22 +47,7 @@ export function getFilterConditions(
   }
   if (filters?.includeTag) {
     // Positive filtering: only include transactions with this tag (or subtags)
-    filterConditions.push(
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(tagsLinkNew)
-          .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
-          .where(
-            and(
-              eq(tagsLinkNew.transaction_id, transactions.transaction_id),
-              sql`${tags_new.tag} = ${filters.includeTag} OR ${
-                tags_new.tag
-              } LIKE ${filters.includeTag + "/"} || '%'`
-            )
-          )
-      )
-    );
+    filterConditions.push(tagFilter(filters.includeTag));
   }
   if (filters?.excludeTags && filters.excludeTags.length > 0) {
     filterConditions.push(

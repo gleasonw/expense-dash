@@ -1,5 +1,9 @@
 import { YyyyMm } from "@/app/utils/dates";
-import { getFilterConditions } from "@/app/utils/transactions_querys";
+import {
+  getFilterConditions,
+  tagExcludesSubtree,
+  tagMatchesSubtree,
+} from "@/app/utils/transactions_querys";
 import { db } from "@/server/db";
 import {
   tagAllocationsNew,
@@ -123,18 +127,12 @@ export function monthSpending({
     const T = alias(tags_new, "t");
 
     const subtreeIncludes = includeTag
-      ? [
-          sql`(${T.tag} = ${includeTag} OR ${T.tag} LIKE ${
-            includeTag + "/"
-          } || '%')`,
-        ]
+      ? [tagMatchesSubtree(T.tag, includeTag)]
       : [];
 
     const subtreeExcludes =
       excludeTags && excludeTags.length
-        ? excludeTags.map(
-            (p) => sql`NOT (${T.tag} = ${p} OR ${T.tag} LIKE ${p + "/"} || '%')`
-          )
+        ? excludeTags.map((p) => tagExcludesSubtree(T.tag, p))
         : [];
 
     const lineItems = db.$with("line_items").as(
