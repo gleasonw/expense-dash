@@ -23,7 +23,7 @@ import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { Tag, TransactionWithTags } from "@/server/schema";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
 import { TransactionWithAutoTagMatchCount } from "@/app/dashboard/transactions_sdk";
-import { Sparkle, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export async function MonthView({
   monthUTC,
