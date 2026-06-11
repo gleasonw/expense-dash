@@ -60,21 +60,6 @@ export const transactions = pgTable("transactions", {
   user_id: integer("user_id").references(() => userTable.id),
 });
 
-//TODO: remove old tag, tag allocation, tag link tables
-
-export const auto_tag_merchants = pgTable("auto_tag_merchants", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  merchant_name: varchar("merchant_name", { length: 255 }),
-  tag: varchar("tag", { length: 255 })
-    .references(() => tags.tag)
-    .notNull(),
-  user_id: integer("user_id").references(() => userTable.id),
-  transaction_id: text("transaction_id").references(
-    () => transactions.transaction_id
-  ),
-});
-
 export const auto_tag_merchants_new = pgTable("auto_tag_merchants_new", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -93,20 +78,7 @@ export type TransactionWithTags = InferSelectModel<typeof transactions> & {
 };
 
 export const transactionsRelations = relations(transactions, ({ many }) => ({
-  tagsLinks: many(tagsLink),
   tagsLinkNew: many(tagsLinkNew),
-}));
-
-export const tags = pgTable("tags", {
-  tag: varchar("tag", { length: 255 }).primaryKey(),
-});
-
-export const tagsRelations = relations(tags, ({ many, one }) => ({
-  tagsLinks: many(tagsLink),
-  allocation: one(tagAllocations, {
-    fields: [tags.tag],
-    references: [tagAllocations.tag],
-  }),
 }));
 
 export const tags_new = pgTable("tags_v2", {
@@ -124,26 +96,6 @@ export const tagsNewRelations = relations(tags_new, ({ many, one }) => ({
   allocation: one(tagAllocationsNew, {
     fields: [tags_new.id],
     references: [tagAllocationsNew.tag_id],
-  }),
-}));
-
-export const tagsLink = pgTable(
-  "tags_link",
-  {
-    transaction_id: text("transaction_id").notNull(),
-    tag: varchar("tag").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.transaction_id, table.tag] })]
-);
-
-export const tagsLinkRelations = relations(tagsLink, ({ one }) => ({
-  transaction: one(transactions, {
-    fields: [tagsLink.transaction_id],
-    references: [transactions.transaction_id],
-  }),
-  tag: one(tags, {
-    fields: [tagsLink.tag],
-    references: [tags.tag],
   }),
 }));
 
@@ -185,20 +137,6 @@ export const tagAllocationsNew = pgTable(
   (table) => [primaryKey({ columns: [table.user_id, table.tag_id] })]
 );
 
-export const tagAllocations = pgTable(
-  "tag_allocations",
-  {
-    user_id: integer("user_id")
-      .notNull()
-      .references(() => userTable.id),
-    tag: varchar("tag", { length: 255 })
-      .notNull()
-      .references(() => tags.tag),
-    allocation: decimal("allocation").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.user_id, table.tag] })]
-);
-
 export const tagAllocationsNewRelations = relations(
   tagAllocationsNew,
   ({ one }) => ({
@@ -208,13 +146,6 @@ export const tagAllocationsNewRelations = relations(
     }),
   })
 );
-
-export const tagAllocationsRelations = relations(tagAllocations, ({ one }) => ({
-  tag: one(tags, {
-    fields: [tagAllocations.tag],
-    references: [tags.tag],
-  }),
-}));
 
 export const userTable = pgTable("user", {
   id: serial("id").primaryKey(),

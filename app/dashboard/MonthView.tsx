@@ -192,12 +192,16 @@ async function TransactionFilters({
 }
 
 async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
+  const allocations = await db.query.tagAllocationsNew.findMany({
+    with: {
+      tag: true,
+    },
+  });
   const taggedSpendingByPeriod = await monthSpending({
     monthUTC,
     excludeTags: ["income", "transfer"],
   });
 
-  console.log({ taggedSpendingByPeriod });
   const toTrack = taggedSpendingByPeriod;
 
   const hierarchyForm = tagsByParent(toTrack);
@@ -221,6 +225,13 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
     return total + parseFloat(tag.tagAllocation);
   }, 0);
   const remainingPercent = 100 - totalAllocatedPercent;
+  const spendingForTag = R.indexBy(
+    taggedSpendingByPeriod,
+    (s) => s.tag_id ?? "unallocated"
+  );
+  const allocationsWithNoSpending = allocations.filter(
+    (a) => !spendingForTag[a.tag_id ?? "unallocated"]
+  );
 
   return (
     <div className="flex flex-col gap-5 w-full">
@@ -256,6 +267,21 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
               </TagAllocation>
             );
           })}
+          {allocationsWithNoSpending.map((allocation) => (
+            <TagAllocation
+              monthUTC={monthUTC}
+              key={allocation.tag_id}
+              tagSpending={{
+                month: monthUTC,
+                amount: "0",
+                color: allocation.tag.color,
+                depth: 0,
+                tag: allocation.tag.tag,
+                tagAllocation: allocation.allocation,
+                tag_id: allocation.tag_id,
+              }}
+            />
+          ))}
         </div>
       </AllocationEditContext>
     </div>
@@ -282,11 +308,17 @@ async function TagAllocation({
   });
 
   if (!estimatedIncomeAndExpenses) {
-    return null;
+    return <div>no income</div>;
   }
 
   if (estimatedIncomeAndExpenses?.length === 0) {
-    return null;
+    return (
+      <div>
+        <div>no income for previous month</div>
+        <div>{tagSpending.tag}</div>
+        <div>{tagSpending.amount}</div>
+      </div>
+    );
   }
 
   if (!tagSpending.tagAllocation) {
@@ -317,7 +349,6 @@ async function TagAllocation({
     <div className="flex flex-col gap-4 border border-gray-200 rounded-lg p-4 bg-white shadow-md">
       <div key={tagSpending.tag_id} className="w-full flex gap-3">
         <div className="flex-col gap-3 w-full flex">
-          {/* Tag name */}
           <div className="flex items-center justify-between gap-2">
             <div className="text-lg font-semibold">{tagSpending.tag}</div>
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -325,7 +356,6 @@ async function TagAllocation({
             </span>
           </div>
 
-          {/* Progress bar */}
           <div className="w-full h-4 overflow-hidden border rounded bg-gray-100">
             <div
               className={`relative h-full bg-${tagSpending.color}-400`}
@@ -338,7 +368,6 @@ async function TagAllocation({
             ></div>
           </div>
 
-          {/* Budgeted / Spent / Net metrics */}
           <div className="grid grid-cols-3 gap-4">
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 font-medium">

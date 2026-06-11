@@ -113,7 +113,6 @@ export function monthSpending({
       afterXMonthsAgo: forPastXMonths,
     });
 
-    // Use one alias consistently for the tags table.
     const T = alias(tags_new, "t");
 
     const subtreeIncludes = includeTag
@@ -124,7 +123,6 @@ export function monthSpending({
         ]
       : [];
 
-    // subtree excludes (node + descendants) applied ONCE at line_items stage
     const subtreeExcludes =
       excludeTags && excludeTags.length
         ? excludeTags.map(
@@ -132,7 +130,6 @@ export function monthSpending({
           )
         : [];
 
-    // 1) Line-items at full tag granularity (keep full path)
     const lineItems = db.$with("line_items").as(
       db
         .select({
@@ -204,7 +201,6 @@ const spendingByMonthForUser = cache(
       excludeTags,
       afterXMonthsAgo,
     });
-    console.log({ filterConditions });
     const spendingByMonth = db.$with("spending_by_month").as(
       db
         .select({
