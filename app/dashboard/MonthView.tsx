@@ -331,12 +331,12 @@ async function TagAllocation({
       <div className="">
         <div
           className={clsx("flex w-full justify-between gap-2", {
-            "text-base font-medium": isRootAllocation,
-            "text-sm text-gray-600": !isRootAllocation,
+            "text-base": isRootAllocation,
+            "text-sm ": !isRootAllocation,
           })}
         >
           <span>{lowestTagForString(tagSpending.tag)}</span>
-          <span>${tagSpending.amount}</span>
+          <CurrencyAmount amount={tagSpending.amount} />
         </div>
         <div className="flex flex-col">
           {tagSpending.depth === 1 ? (
@@ -361,10 +361,24 @@ async function TagAllocation({
       ? Math.min((Number(tagSpending.amount) / targetSpending) * 100, 100)
       : 0;
 
+  if (!isRootAllocation) {
+    return (
+      <SubcategoryAllocationView
+        tagSpending={tagSpending}
+        allocation={allocation}
+        allocationType={allocationType}
+        targetSpending={targetSpending}
+        netAmount={netAmount}
+      >
+        {children}
+      </SubcategoryAllocationView>
+    );
+  }
+
   return (
     <div
-      className={clsx("flex flex-col gap-4 rounded-lg p-4 bg-white", {
-        "border border-gray-200 shadow-md": isRootAllocation,
+      className={clsx("flex flex-col gap-4 rounded-lg bg-white", {
+        "border border-gray-200 shadow-md p-4": isRootAllocation,
       })}
     >
       <div key={tagSpending.tag_id} className="w-full flex gap-3">
@@ -452,14 +466,63 @@ async function TagAllocation({
           />
         )}
       </div>
-      <div className="flex flex-col ">
-        <div className="pl-10">
-          {children}
-          {tagSpending.depth === 1 ? (
-            <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
-          ) : null}
-        </div>
+      <div className="pl-10 flex flex-col gap-2">
+        {children}
+        {tagSpending.depth === 1 ? (
+          <RootSpendingForTag spending={tagSpending} monthUTC={monthUTC} />
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function SubcategoryAllocationView({
+  tagSpending,
+  children,
+  allocation,
+  allocationType,
+  targetSpending,
+  netAmount,
+}: {
+  tagSpending: SpendingRow;
+  children?: React.ReactNode;
+  allocation: number;
+  allocationType: "percent" | "fixed";
+  targetSpending: number;
+  netAmount: number;
+}) {
+  const displayTag = lowestTagForString(tagSpending.tag);
+  const remainingAmount = Math.round(Math.abs(netAmount));
+  const remainingLabel = netAmount >= 0 ? "remaining" : "over";
+
+  return (
+    <div className="border-t border-gray-100  text-sm">
+      <div className="flex w-full justify-between gap-3">
+        <span className="min-w-0 truncate">{displayTag}</span>
+        <CurrencyAmount amount={Math.abs(Number(tagSpending.amount))} />
+      </div>
+      <div className="mt-0.5 min-w-0 truncate text-xs text-gray-500">
+        <span>${Math.round(targetSpending)} budgeted</span>
+        <span className="mx-1.5 text-gray-300">/</span>
+        <span
+          className={clsx({
+            "text-green-600": netAmount >= 0,
+            "text-red-600": netAmount < 0,
+          })}
+        >
+          ${remainingAmount} {remainingLabel}
+        </span>
+      </div>
+      {tagSpending.tag_id && tagSpending.tagAllocation && (
+        <div className="mt-2 flex justify-end">
+          <AllocationEditControls
+            tagId={tagSpending.tag_id}
+            initialAllocation={tagSpending.tagAllocation}
+            initialAllocationType={tagSpending.tagAllocationType ?? "percent"}
+          />
+        </div>
+      )}
+      <div className="flex flex-col">{children}</div>
     </div>
   );
 }
@@ -503,12 +566,20 @@ async function RootSpendingForTag({
     return null;
   }
   return (
-    <div className="border-t border-gray-100 px-1 py-2 text-sm text-gray-500">
+    <div className="border-t border-gray-100 text-sm ">
       <div className="flex w-full justify-between gap-2">
         <span>unbound</span>
-        <span>${baseSpend.amount}</span>
+        <CurrencyAmount amount={baseSpend.amount} />
       </div>
     </div>
+  );
+}
+
+function CurrencyAmount({ amount }: { amount: string | number }) {
+  return (
+    <span className="inline-block min-w-[8ch] shrink-0 text-right tabular-nums">
+      ${amount}
+    </span>
   );
 }
 
