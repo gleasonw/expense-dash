@@ -23,6 +23,7 @@ import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { Tag, TransactionWithTags } from "@/server/schema";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
 import { TransactionWithAutoTagMatchCount } from "@/app/dashboard/transactions_sdk";
+import { Sparkle, Sparkles } from "lucide-react";
 
 export async function MonthView({
   monthUTC,
@@ -139,14 +140,15 @@ export async function MonthView({
                   </RemoveTagButton>
                 ))}
               <AddTagInput tags={allTags} transaction={t} />
-              <button
-                type="button"
-                className="rounded-full border border-gray-300 px-2 py-1 text-xs text-gray-600"
-                title={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
-                aria-label={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
-              >
-                Auto {t.autoTagMatchCount}
-              </button>
+              {t.autoTagMatchCount > 0 && (
+                <div
+                  className="border-gray-300 px-2 py-1 text-xs text-gray-600"
+                  title={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
+                  aria-label={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
+                >
+                  <Sparkles className="h-5 w-5 text-gray-300" />
+                </div>
+              )}
               <div className="ml-auto">
                 <TransactionDateEditor
                   date={new Date(t.date)}
@@ -224,7 +226,10 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
     <div className="flex flex-col gap-5 w-full">
       <AllocationEditContext>
         <div className="flex justify-between items-center">
-          <CreateAllocationForm tags={tags} remainingPercent={remainingPercent} />
+          <CreateAllocationForm
+            tags={tags}
+            remainingPercent={remainingPercent}
+          />
           <AllocationEditButton />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
