@@ -8,6 +8,7 @@ import { allUserTags } from "@/app/dashboard/tags_sdk";
 import { ViewToggle } from "@/app/dashboard/ViewToggle";
 import { MonthView } from "@/app/dashboard/MonthView";
 import { AggregateView } from "@/app/dashboard/AggregateView";
+import { getBuckets } from "@/app/dashboard/buckets_sdk";
 
 // TODO
 // break down transactions table into accounts (tabs probably make the most sense here)
@@ -105,7 +106,13 @@ export default async function Dashboard({
   const mParamString = typeof mParam === "string" ? mParam : undefined;
   const monthUTC = dateUtils.normYyyyMm(mParamString);
 
-  const [tsMerged, netSpendForMonth, spendingLast5Months, testAllNetSpend] =
+  const [
+    tsMerged,
+    netSpendForMonth,
+    spendingLast5Months,
+    testAllNetSpend,
+    buckets,
+  ] =
     await Promise.all([
       getTransactionsWithTags({
         tag: filterByTag,
@@ -119,6 +126,7 @@ export default async function Dashboard({
         atDepth: 1,
       }),
       getNetSpendingByMonth({ pastXMonths: 3 }),
+      getBuckets(),
     ]);
 
   console.log({ testAllNetSpend });
@@ -134,6 +142,7 @@ export default async function Dashboard({
         amountSort={validatedAmountSort}
         tsMerged={tsMerged}
         allTags={allTags}
+        buckets={buckets.filter((bucket) => !bucket.isArchived)}
         netSpendForSelectedMonth={netSpendForSelectedMonth}
         spendingLast5Months={spendingLast5Months ?? []}
         testAllNetSpend={testAllNetSpend ?? []}

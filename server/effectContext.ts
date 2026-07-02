@@ -33,28 +33,6 @@ export const syncTransactionContext = Context.empty().pipe(
         return updatedUser;
       }),
   }),
-  Context.add(TransactionsService, {
-    insertTransactions: (toAdd, userId) => {
-      return Effect.tryPromise(async () => {
-        if (toAdd.length === 0) {
-          return [];
-        }
-        return db
-          .insert(transactions)
-          .values(
-            toAdd.map((t) => ({
-              ...t,
-              user_id: userId,
-              authorized_datetime: t.authorized_datetime
-                ? new Date(t.authorized_datetime)
-                : null,
-              datetime: t.datetime ? new Date(t.datetime) : null,
-            }))
-          )
-          .returning();
-      });
-    },
-  }),
   Context.add(PlaidService, {
     latestTransactions: ({ access_token, cursor, count }) =>
       Effect.tryPromise(async () => {
@@ -68,5 +46,5 @@ export const syncTransactionContext = Context.empty().pipe(
         }
         return res.data;
       }),
-  })
+  }),
 );

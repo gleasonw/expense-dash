@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import {
   auto_tag_merchants_new,
   bucketMovements,
+  buckets,
   tags_new,
   tagsLinkNew,
   transactions,
@@ -19,6 +20,7 @@ import {
   sql,
   gte,
   lt,
+  inArray,
 } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cache } from "react";
@@ -312,9 +314,40 @@ export const getTransactionsWithTags = cache(
       user.user
     );
 
+    const transactionIds = mergedTransactions.map(
+      (transaction) => transaction.transaction_id
+    );
+
+    const fundingRows =
+      transactionIds.length === 0
+        ? []
+        : await db
+            .select({
+              transactionId: bucketMovements.transactionId,
+              movementId: bucketMovements.id,
+              bucketId: buckets.id,
+              bucketName: buckets.name,
+              bucketColor: buckets.color,
+              amount: bucketMovements.amount,
+            })
+            .from(bucketMovements)
+            .innerJoin(buckets, eq(bucketMovements.bucketId, buckets.id))
+            .where(
+              and(
+                eq(bucketMovements.userId, user.user.id),
+                inArray(bucketMovements.transactionId, transactionIds),
+                sql`CAST(${bucketMovements.amount} AS NUMERIC) < 0`
+              )
+            );
+    const fundingByTransactionId = R.indexBy(
+      fundingRows,
+      (row) => row.transactionId ?? ""
+    );
+
     return mergedTransactions.map((transaction) => ({
       ...transaction,
       autoTagMatchCount: autoTagMatchCounts[transaction.transaction_id] ?? 0,
+      fundedByBucket: fundingByTransactionId[transaction.transaction_id],
     }));
   }
 );
@@ -349,7 +382,10 @@ export async function getSavingsTransactionsWithAllocations(month: string) {
     )
     .leftJoin(
       bucketMovements,
-      eq(transactions.transaction_id, bucketMovements.transactionId)
+      and(
+        eq(transactions.transaction_id, bucketMovements.transactionId),
+        sql`CAST(${bucketMovements.amount} AS NUMERIC) > 0`
+      )
     )
     .where(
       and(

@@ -29,6 +29,32 @@ import { Tag, TransactionWithTags } from "@/server/schema";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
 import { TransactionWithAutoTagMatchCount } from "@/app/dashboard/transactions_sdk";
 import { Sparkles } from "lucide-react";
+import { FundedByBucketSelect } from "@/app/dashboard/FundedByBucketSelect";
+
+type BucketFundingOption = {
+  id: number;
+  name: string;
+  color: string | null;
+};
+
+type FundedTransaction = TransactionWithTags &
+  TransactionWithAutoTagMatchCount & {
+    fundedByBucket?: {
+      movementId: number;
+      bucketId: number;
+      bucketName: string;
+      bucketColor: string | null;
+      amount: string;
+    };
+  };
+
+function formatMoney(amount: number) {
+  return amount.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  });
+}
 
 export async function MonthView({
   monthUTC,
@@ -36,17 +62,20 @@ export async function MonthView({
   amountSort,
   tsMerged,
   allTags,
+  buckets,
   netSpendForSelectedMonth,
 }: {
   monthUTC: dateUtils.YyyyMm;
   filterByTag?: string;
   amountSort?: "asc" | "desc";
-  tsMerged: Array<TransactionWithTags & TransactionWithAutoTagMatchCount>;
+  tsMerged: FundedTransaction[];
   allTags: Tag[];
+  buckets: BucketFundingOption[];
   netSpendForSelectedMonth?: {
     month: string;
     total_income: string;
     total_spending: string;
+    bucket_funded_spending: string;
     net_amount: string;
   };
   spendingLast5Months: SpendingRow[];
@@ -57,6 +86,30 @@ export async function MonthView({
     net_amount: string;
   }>;
 }) {
+  const incomeAmount = Number(netSpendForSelectedMonth?.total_income ?? 0);
+  const spendingAmount = Math.abs(
+    Number(netSpendForSelectedMonth?.total_spending ?? 0)
+  );
+  const netAmount = Number(netSpendForSelectedMonth?.net_amount ?? 0);
+  const bucketFundedAmount = Number(
+    netSpendForSelectedMonth?.bucket_funded_spending ?? 0
+  );
+  const cashflowGap = Math.max(-netAmount, 0);
+  const coveredByBuckets = Math.min(bucketFundedAmount, cashflowGap);
+  const uncoveredOverspend = Math.max(cashflowGap - bucketFundedAmount, 0);
+  const netStateClass =
+    netAmount >= 0
+      ? "bg-green-50 border border-green-200"
+      : uncoveredOverspend > 0
+        ? "bg-red-50 border border-red-200"
+        : "bg-amber-50 border border-amber-200";
+  const netTextClass =
+    netAmount >= 0
+      ? "text-green-700"
+      : uncoveredOverspend > 0
+        ? "text-red-700"
+        : "text-amber-700";
+
   return (
     <div className="px-2 flex flex-col justify-center w-full items-center max-w-[1000px] gap-5">
       <div className="flex flex-col lg:flex-row gap-4 w-full items-stretch">
@@ -64,14 +117,14 @@ export async function MonthView({
           <MonthPicker monthUTC={monthUTC} />
         </FeatureBox>
 
-        <div className="grid grid-cols-3 gap-4 flex-1">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
           {/* Income Card */}
           <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
             <span className="text-sm font-medium text-gray-500 mb-1">
               Income
             </span>
             <span className="text-2xl font-bold text-gray-900">
-              ${netSpendForSelectedMonth?.total_income}
+              {formatMoney(incomeAmount)}
             </span>
           </div>
 
@@ -81,28 +134,31 @@ export async function MonthView({
               Spending
             </span>
             <span className="text-2xl font-bold text-gray-900">
-              ${netSpendForSelectedMonth?.total_spending}
+              {formatMoney(spendingAmount)}
+            </span>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
+            <span className="text-sm font-medium text-gray-500 mb-1">
+              Funded by buckets
+            </span>
+            <span className="text-2xl font-bold text-gray-900">
+              {formatMoney(bucketFundedAmount)}
             </span>
           </div>
 
           {/* Net Card */}
-          <div
-            className={`rounded-lg shadow-sm p-4 flex flex-col ${
-              Number(netSpendForSelectedMonth?.net_amount) < 0
-                ? "bg-red-50 border border-red-200"
-                : "bg-green-50 border border-green-200"
-            }`}
-          >
+          <div className={`rounded-lg shadow-sm p-4 flex flex-col ${netStateClass}`}>
             <span className="text-sm font-medium text-gray-600 mb-1">Net</span>
-            <span
-              className={`text-2xl font-bold ${
-                Number(netSpendForSelectedMonth?.net_amount) < 0
-                  ? "text-red-700"
-                  : "text-green-700"
-              }`}
-            >
-              ${netSpendForSelectedMonth?.net_amount}
+            <span className={`text-2xl font-bold ${netTextClass}`}>
+              {formatMoney(netAmount)}
             </span>
+            {cashflowGap > 0 && (
+              <span className="mt-1 text-xs text-gray-600">
+                {formatMoney(coveredByBuckets)} covered /{" "}
+                {formatMoney(uncoveredOverspend)} uncovered
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -153,6 +209,13 @@ export async function MonthView({
                 >
                   <Sparkles className="h-5 w-5 text-gray-300" />
                 </div>
+              )}
+              {Number(t.amount) > 0 && buckets.length > 0 && (
+                <FundedByBucketSelect
+                  transactionId={t.transaction_id}
+                  buckets={buckets}
+                  selectedBucketId={t.fundedByBucket?.bucketId}
+                />
               )}
               <div className="ml-auto">
                 <TransactionDateEditor

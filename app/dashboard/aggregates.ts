@@ -6,6 +6,7 @@ import {
 } from "@/app/utils/transactions_querys";
 import { db } from "@/server/db";
 import {
+  bucketMovements,
   tagAllocationsNew,
   tags_new,
   tagsLinkNew,
@@ -357,13 +358,41 @@ export const getNetSpendingByMonth = cache(
       .groupBy(sql`DATE_TRUNC('month', ${transactions.date})`)
       .as("ms");
 
+    const bucketFundingSubquery = db
+      .select({
+        month: sql<string>`DATE_TRUNC('month', ${transactions.date})`.as(
+          "month"
+        ),
+        bucket_funded_spending:
+          sql<number>`SUM(ABS(CAST(${bucketMovements.amount} AS NUMERIC)))`.as(
+            "bucket_funded_spending"
+          ),
+      })
+      .from(bucketMovements)
+      .innerJoin(
+        transactions,
+        eq(bucketMovements.transactionId, transactions.transaction_id)
+      )
+      .where(
+        and(
+          eq(bucketMovements.userId, user.user.id),
+          eq(transactions.user_id, user.user.id),
+          sql`CAST(${bucketMovements.amount} AS NUMERIC) < 0`,
+          ...filterConditions
+        )
+      )
+      .groupBy(sql`DATE_TRUNC('month', ${transactions.date})`)
+      .as("bf");
+
     return await db
       .select({
         // oddly, drizzle won't auto alias, so to avoid ambiguity we have to manually alias
         // https://github.com/drizzle-team/drizzle-orm/issues/2772
-        month: sql<string>`COALESCE(mi.month, ms.month) as month`,
+        month: sql<string>`COALESCE(mi.month, ms.month, bf.month) as month`,
         total_income: sql<string>`COALESCE(mi.total_income, 0) as total_income`,
         total_spending: sql<string>`COALESCE(ms.total_spending, 0) as total_spending`,
+        bucket_funded_spending:
+          sql<string>`COALESCE(bf.bucket_funded_spending, 0) as bucket_funded_spending`,
         net_amount: sql<string>`
     COALESCE(mi.total_income, 0)
     + COALESCE(ms.total_spending, 0) as net_amount
@@ -371,6 +400,10 @@ export const getNetSpendingByMonth = cache(
       })
       .from(incomeSubquery)
       .fullJoin(spendSubquery, eq(sql`mi.month`, sql`ms.month`))
-      .orderBy(asc(sql`COALESCE(mi.month, ms.month)`));
+      .fullJoin(
+        bucketFundingSubquery,
+        eq(sql`COALESCE(mi.month, ms.month)`, sql`bf.month`)
+      )
+      .orderBy(asc(sql`COALESCE(mi.month, ms.month, bf.month)`));
   }
 );

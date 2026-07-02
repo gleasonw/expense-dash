@@ -36,6 +36,7 @@ export async function getMovementsWithOrphanedStatus() {
       isOrphaned: sql<boolean>`
         CASE
           WHEN bucket_movements.transaction_id IS NULL THEN false
+          WHEN CAST(bucket_movements.amount AS NUMERIC) < 0 THEN false
           WHEN NOT EXISTS (
             SELECT 1
             FROM transactions t

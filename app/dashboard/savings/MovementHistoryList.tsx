@@ -71,61 +71,77 @@ export function MovementHistoryList({
                 })}
               </h4>
               <span className="text-sm font-semibold text-gray-900">
-                ${monthTotal.toFixed(2)}
+                {monthTotal < 0 ? "-" : ""}${Math.abs(monthTotal).toFixed(2)}
               </span>
             </div>
 
             <div className="space-y-2">
-              {monthMovements.map((movement) => (
-                <div
-                  key={movement.id}
-                  className="flex items-start justify-between py-2 px-3 bg-gray-50 rounded-md text-sm"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600">
-                        {new Date(movement.occurredAt).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                          }
+              {monthMovements.map((movement) => {
+                const amount = parseFloat(movement.amount);
+                const isDrawdown = amount < 0;
+                return (
+                  <div
+                    key={movement.id}
+                    className={`flex items-start justify-between py-2 px-3 rounded-md text-sm ${
+                      isDrawdown ? "bg-amber-50" : "bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600">
+                          {new Date(movement.occurredAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                            }
+                          )}
+                        </span>
+                        {movement.transactionId && (
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded ${
+                              isDrawdown
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
+                            {isDrawdown ? "Funded spending" : "Transaction"}
+                          </span>
                         )}
-                      </span>
-                      {movement.transactionId && (
-                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                          Transaction
-                        </span>
-                      )}
-                      {movement.isOrphaned && (
-                        <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">
-                          Orphaned
-                        </span>
+                        {movement.isOrphaned && (
+                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">
+                            Orphaned
+                          </span>
+                        )}
+                      </div>
+                      {movement.note && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {movement.note}
+                        </p>
                       )}
                     </div>
-                    {movement.note && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {movement.note}
-                      </p>
-                    )}
-                  </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-gray-900">
-                      ${parseFloat(movement.amount).toFixed(2)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(movement.id)}
-                      disabled={deletingId === movement.id}
-                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      {deletingId === movement.id ? "..." : "✕"}
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`font-medium ${
+                          isDrawdown ? "text-amber-800" : "text-gray-900"
+                        }`}
+                      >
+                        {amount < 0 ? "-" : ""}${Math.abs(amount).toFixed(2)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(movement.id)}
+                        disabled={deletingId === movement.id}
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        {deletingId === movement.id ? "..." : "✕"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );

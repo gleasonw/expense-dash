@@ -5,6 +5,8 @@ import { db } from "@/server/db";
 import { getUserWithTokenThrows } from "@/server/session";
 import {
   auto_tag_merchants_new,
+  bucketMovements,
+  buckets,
   tagAllocationsNew,
   tags_new,
   tagsLinkNew,
@@ -140,6 +142,72 @@ export async function updateTransactionDate(
       )
     );
   revalidatePath("/dashboard");
+}
+
+export async function setTransactionBucketFunding({
+  transactionId,
+  bucketId,
+}: {
+  transactionId: string;
+  bucketId: number | null;
+}) {
+  const user = await getUserWithTokenThrows();
+
+  await db.transaction(async (tx) => {
+    const transaction = await tx.query.transactions.findFirst({
+      where: and(
+        eq(transactions.transaction_id, transactionId),
+        eq(transactions.user_id, user.user.id)
+      ),
+    });
+
+    if (!transaction) {
+      throw new Error("transaction not found");
+    }
+
+    await tx
+      .delete(bucketMovements)
+      .where(
+        and(
+          eq(bucketMovements.userId, user.user.id),
+          eq(bucketMovements.transactionId, transactionId),
+          sql`CAST(${bucketMovements.amount} AS NUMERIC) < 0`
+        )
+      );
+
+    if (bucketId === null) {
+      return;
+    }
+
+    const bucket = await tx.query.buckets.findFirst({
+      where: and(
+        eq(buckets.id, bucketId),
+        eq(buckets.userId, user.user.id),
+        eq(buckets.isArchived, false)
+      ),
+    });
+
+    if (!bucket) {
+      throw new Error("bucket not found");
+    }
+
+    const transactionAmount = parseFloat(transaction.amount);
+    if (!Number.isFinite(transactionAmount) || transactionAmount <= 0) {
+      throw new Error("only spending transactions can be funded by a bucket");
+    }
+
+    await tx.insert(bucketMovements).values({
+      userId: user.user.id,
+      bucketId,
+      transactionId,
+      amount: (-Math.abs(transactionAmount)).toFixed(2),
+      occurredAt: new Date(transaction.date),
+      note: "Funded transaction",
+    });
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/savings");
 }
 
 export async function setTagAllocation(formData: FormData) {
