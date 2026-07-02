@@ -88,11 +88,11 @@ export async function MonthView({
 }) {
   const incomeAmount = Number(netSpendForSelectedMonth?.total_income ?? 0);
   const spendingAmount = Math.abs(
-    Number(netSpendForSelectedMonth?.total_spending ?? 0)
+    Number(netSpendForSelectedMonth?.total_spending ?? 0),
   );
   const netAmount = Number(netSpendForSelectedMonth?.net_amount ?? 0);
   const bucketFundedAmount = Number(
-    netSpendForSelectedMonth?.bucket_funded_spending ?? 0
+    netSpendForSelectedMonth?.bucket_funded_spending ?? 0,
   );
   const cashflowGap = Math.max(-netAmount, 0);
   const coveredByBuckets = Math.min(bucketFundedAmount, cashflowGap);
@@ -138,17 +138,10 @@ export async function MonthView({
             </span>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
-            <span className="text-sm font-medium text-gray-500 mb-1">
-              Funded by buckets
-            </span>
-            <span className="text-2xl font-bold text-gray-900">
-              {formatMoney(bucketFundedAmount)}
-            </span>
-          </div>
-
           {/* Net Card */}
-          <div className={`rounded-lg shadow-sm p-4 flex flex-col ${netStateClass}`}>
+          <div
+            className={`rounded-lg shadow-sm p-4 flex flex-col ${netStateClass}`}
+          >
             <span className="text-sm font-medium text-gray-600 mb-1">Net</span>
             <span className={`text-2xl font-bold ${netTextClass}`}>
               {formatMoney(netAmount)}
@@ -297,10 +290,10 @@ async function SpendingTargets({ monthUTC }: { monthUTC: dateUtils.YyyyMm }) {
   const remainingPercent = 100 - totalAllocatedPercent;
   const spendingForTag = R.indexBy(
     taggedSpendingByPeriod,
-    (s) => s.tag_id ?? "unallocated"
+    (s) => s.tag_id ?? "unallocated",
   );
   const allocationsWithNoSpending = allocations.filter(
-    (a) => !spendingForTag[a.tag_id ?? "unallocated"]
+    (a) => !spendingForTag[a.tag_id ?? "unallocated"],
   );
 
   return (
@@ -369,7 +362,7 @@ async function TagAllocation({
 }) {
   const estimatedIncomeAndExpenses = await monthSpending({
     monthUTC: `${new Date().getUTCFullYear()}-${String(
-      new Date().getUTCMonth()
+      new Date().getUTCMonth(),
     ).padStart(2, "0")}-01`,
   });
 
@@ -466,7 +459,7 @@ async function TagAllocation({
               {
                 "h-4": isRootAllocation,
                 "h-2": !isRootAllocation,
-              }
+              },
             )}
           >
             <div
@@ -606,15 +599,15 @@ async function RootSpendingForTag({
     .from(transactions)
     .innerJoin(
       tagsLinkNew,
-      eq(transactions.transaction_id, tagsLinkNew.transaction_id)
+      eq(transactions.transaction_id, tagsLinkNew.transaction_id),
     )
     .innerJoin(tags_new, eq(tagsLinkNew.tag_id, tags_new.id))
     .where(
       and(
         eq(transactions.user_id, user.user.id),
         eq(tags_new.id, spending.tag_id),
-        ...filterConditions
-      )
+        ...filterConditions,
+      ),
     )
     .groupBy(sql`DATE_TRUNC('month', ${transactions.date}), ${tags_new.tag}`);
   const baseSpend = baseSpendResults?.at(0);
