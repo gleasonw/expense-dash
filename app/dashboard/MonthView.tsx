@@ -113,31 +113,16 @@ export async function MonthView({
     Number(netSpendForSelectedMonth?.total_spending ?? 0),
   );
   const netAmount = Number(netSpendForSelectedMonth?.net_amount ?? 0);
-  const monthBucketFundedAmount = Number(
-    netSpendForSelectedMonth?.bucket_funded_spending ?? 0,
-  );
   const bucketFundedAmount = savingsFundingStatus.bucketFundedAmount;
   const savingsReimbursements = savingsFundingStatus.reimbursedAmount;
   const savingsFundingNeeded = savingsFundingStatus.fundingNeeded;
   const excessReimbursement = savingsFundingStatus.excessReimbursement;
-  const cashflowGap = Math.max(-netAmount, 0);
-  const coveredByBuckets = Math.min(monthBucketFundedAmount, cashflowGap);
-  const uncoveredOverspend = Math.max(
-    cashflowGap - monthBucketFundedAmount,
-    0,
-  );
   const netStateClass =
     netAmount >= 0
       ? "bg-green-50 border border-green-200"
-      : uncoveredOverspend > 0
-        ? "bg-red-50 border border-red-200"
-        : "bg-amber-50 border border-amber-200";
+      : "bg-red-50 border border-red-200";
   const netTextClass =
-    netAmount >= 0
-      ? "text-green-700"
-      : uncoveredOverspend > 0
-        ? "text-red-700"
-        : "text-amber-700";
+    netAmount >= 0 ? "text-green-700" : "text-red-700";
 
   return (
     <div className="px-2 flex flex-col justify-center w-full items-center max-w-[1000px] gap-5">
@@ -175,12 +160,9 @@ export async function MonthView({
             <span className={`text-2xl font-bold ${netTextClass}`}>
               {formatMoney(netAmount)}
             </span>
-            {cashflowGap > 0 && (
-              <span className="mt-1 text-xs text-gray-600">
-                {formatMoney(coveredByBuckets)} covered /{" "}
-                {formatMoney(uncoveredOverspend)} uncovered
-              </span>
-            )}
+            <span className="mt-1 text-xs text-gray-600">
+              Income minus spending
+            </span>
           </div>
 
           {/* Savings reimbursement card */}

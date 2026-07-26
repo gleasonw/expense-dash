@@ -13,6 +13,18 @@ type Movement = {
   isOrphaned?: boolean;
 };
 
+const monthFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  month: "long",
+  year: "numeric",
+});
+
+const dayFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  month: "short",
+  day: "numeric",
+});
+
 export function MovementHistoryList({
   movements,
   onMovementDeleted,
@@ -65,10 +77,7 @@ export function MovementHistoryList({
           <div key={month} className="border-l-2 border-gray-200 pl-3">
             <div className="flex justify-between items-center mb-2">
               <h4 className="font-medium text-sm text-gray-700">
-                {new Date(month + "-01").toLocaleDateString("en-US", {
-                  month: "long",
-                  year: "numeric",
-                })}
+                {monthFormatter.format(new Date(`${month}-01T00:00:00Z`))}
               </h4>
               <span className="text-sm font-semibold text-gray-900">
                 {monthTotal < 0 ? "-" : ""}${Math.abs(monthTotal).toFixed(2)}
@@ -89,13 +98,7 @@ export function MovementHistoryList({
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-600">
-                          {new Date(movement.occurredAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                            }
-                          )}
+                          {dayFormatter.format(new Date(movement.occurredAt))}
                         </span>
                         {movement.transactionId && (
                           <span
