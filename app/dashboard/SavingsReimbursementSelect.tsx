@@ -20,7 +20,7 @@ export function SavingsReimbursementSelect({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="flex items-center gap-1 text-xs text-gray-500">
+    <div className="flex items-center gap-1.5 text-xs text-gray-500">
       <span>Credit type</span>
       <Select
         value={isReimbursement ? "savings-reimbursement" : "regular-credit"}
@@ -34,7 +34,7 @@ export function SavingsReimbursementSelect({
           });
         }}
       >
-        <SelectTrigger className="h-7 w-[180px] border-gray-200 bg-white text-xs shadow-none">
+        <SelectTrigger className="h-7 w-auto min-w-[140px] rounded-full border-gray-200 bg-gray-50 px-2.5 text-xs shadow-none hover:bg-gray-100">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -31,21 +31,43 @@ const utcFormatter = new Intl.DateTimeFormat("en-US", {
   day: "2-digit",
 });
 
+function compactDate(date: Date) {
+  const includeYear = date.getUTCFullYear() !== new Date().getUTCFullYear();
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" as const } : {}),
+  }).format(date);
+}
+
 export function TransactionDateEditor({
   date,
   transaction,
+  compact = false,
 }: {
   date?: Date;
   transaction: { transaction_id: string };
+  compact?: boolean;
 }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           data-empty={!date}
-          className="data-[empty=true]:text-muted-foreground w-[200px] justify-end gap-2 flex text-sm text-gray-400 font-normal "
+          className={`data-[empty=true]:text-muted-foreground flex justify-end gap-2 font-normal text-gray-400 transition-colors hover:text-gray-600 ${
+            compact ? "w-auto text-xs" : "w-[200px] text-sm"
+          }`}
         >
-          {date ? utcFormatter.format(date) : <span>Pick a date</span>}
+          {date ? (
+            compact ? (
+              compactDate(date)
+            ) : (
+              utcFormatter.format(date)
+            )
+          ) : (
+            <span>Pick a date</span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">

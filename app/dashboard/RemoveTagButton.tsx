@@ -30,7 +30,7 @@ export function RemoveTagButton({
 }) {
   return (
     <button
-      className={`bg-${tag.color}-200 text-${tag.color}-800 text-sm  px-1 py-0 rounded-md`}
+      className={`bg-${tag.color}-100 text-${tag.color}-800 rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:bg-${tag.color}-200`}
       onClick={() =>
         removeTagFromTransaction({
           transactionId: transaction.transaction_id,
@@ -46,9 +46,11 @@ export function RemoveTagButton({
 export function AddTagInput({
   tags,
   transaction,
+  label = "+",
 }: {
   tags: Array<{ id: string; tag: string }>;
   transaction: { transaction_id: string };
+  label?: string;
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -59,8 +61,11 @@ export function AddTagInput({
           role="combobox"
           aria-expanded={open}
           aria-controls="tags"
-          className="justify-between hover:cursor-text w-5 h-5"
-        />
+          aria-label="Add category"
+          className="h-6 rounded-full border border-dashed border-gray-300 px-2 text-xs font-medium text-gray-500 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-700"
+        >
+          {label}
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0">
         <Command>

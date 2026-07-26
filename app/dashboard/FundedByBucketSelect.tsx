@@ -28,8 +28,8 @@ export function FundedByBucketSelect({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="flex items-center gap-1 text-xs text-gray-500">
-      <span>Funded by</span>
+    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+      <span>Paid from</span>
       <Select
         value={selectedBucketId ? String(selectedBucketId) : "monthly-budget"}
         disabled={isPending}
@@ -42,7 +42,7 @@ export function FundedByBucketSelect({
           });
         }}
       >
-        <SelectTrigger className="h-7 w-[170px] border-gray-200 bg-white text-xs shadow-none">
+        <SelectTrigger className="h-7 w-auto min-w-[135px] rounded-full border-gray-200 bg-gray-50 px-2.5 text-xs shadow-none hover:bg-gray-100">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

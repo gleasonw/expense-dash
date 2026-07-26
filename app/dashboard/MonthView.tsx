@@ -58,6 +58,18 @@ function formatMoney(amount: number) {
   });
 }
 
+function formatTransactionAmount(amount: number) {
+  const formatted = formatMoney(Math.abs(amount));
+  if (amount < 0) {
+    return `+${formatted}`;
+  }
+  return formatted;
+}
+
+function tagIsInSubtree(tag: string, root: string) {
+  return tag === root || tag.startsWith(`${root}/`);
+}
+
 export async function MonthView({
   monthUTC,
   filterByTag,
@@ -222,58 +234,85 @@ export async function MonthView({
       </FeatureBox>
       <FeatureBox className="flex flex-col w-full">
         <TransactionFilters selectedTag={filterByTag} amountSort={amountSort} />
-        {tsMerged.map((t) => (
-          <div
-            key={t.transaction_id}
-            className="p-3 border-b hover:bg-gray-100 flex gap-1 flex-col"
-          >
-            <div className="flex justify-between">
-              <span className="text-sm">{t.name}</span>
-              <div className="flex flex-col items-end text-lg">
-                <span>${Number(t.amount).toFixed(2)}</span>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {t.tags
-                .slice()
-                .sort((a: Tag, b: Tag) => a.tag.localeCompare(b.tag))
-                .map((tag: Tag) => (
-                  <RemoveTagButton key={tag.tag} transaction={t} tag={tag}>
-                    {tag.tag}
-                  </RemoveTagButton>
-                ))}
-              <AddTagInput tags={allTags} transaction={t} />
-              {t.autoTagMatchCount > 0 && (
-                <div
-                  className="border-gray-300 px-2 py-1 text-xs text-gray-600"
-                  title={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
-                  aria-label={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
-                >
-                  <Sparkles className="h-5 w-5 text-gray-300" />
+        {tsMerged.map((t) => {
+          const amount = Number(t.amount);
+          const isTransfer = t.tags.some((tag) =>
+            tagIsInSubtree(tag.tag, "transfer"),
+          );
+          const isCredit = amount < 0;
+
+          return (
+            <div
+              key={t.transaction_id}
+              className="flex flex-col gap-2 border-b border-gray-100 px-3 py-2.5 transition-colors hover:bg-gray-50"
+            >
+              <div className="flex min-w-0 items-center justify-between gap-4">
+                <span className="min-w-0 truncate text-sm font-medium text-gray-900">
+                  {t.name}
+                </span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <TransactionDateEditor
+                    date={new Date(t.date)}
+                    transaction={t}
+                    compact
+                  />
+                  <span
+                    className={clsx("min-w-[88px] text-right text-sm font-semibold", {
+                      "text-gray-400": isTransfer,
+                      "text-emerald-700": isCredit && !isTransfer,
+                      "text-gray-900": !isCredit && !isTransfer,
+                    })}
+                  >
+                    {formatTransactionAmount(amount)}
+                  </span>
                 </div>
-              )}
-              {Number(t.amount) > 0 && buckets.length > 0 && (
-                <FundedByBucketSelect
-                  transactionId={t.transaction_id}
-                  buckets={buckets}
-                  selectedBucketId={t.fundedByBucket?.bucketId}
-                />
-              )}
-              {Number(t.amount) < 0 && (
-                <SavingsReimbursementSelect
-                  transactionId={t.transaction_id}
-                  isReimbursement={t.isSavingsReimbursement}
-                />
-              )}
-              <div className="ml-auto">
-                <TransactionDateEditor
-                  date={new Date(t.date)}
-                  transaction={t}
-                />
+              </div>
+
+              <div className="flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1.5 text-gray-500">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {t.tags
+                    .slice()
+                    .sort((a: Tag, b: Tag) => a.tag.localeCompare(b.tag))
+                    .map((tag: Tag) => (
+                      <RemoveTagButton key={tag.tag} transaction={t} tag={tag}>
+                        {tag.tag}
+                      </RemoveTagButton>
+                    ))}
+                  {t.autoTagMatchCount > 0 && (
+                    <span
+                      className="inline-flex items-center text-gray-300"
+                      title={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
+                      aria-label={`Auto-tag rules matched: ${t.autoTagMatchCount}`}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </span>
+                  )}
+                  <AddTagInput
+                    tags={allTags}
+                    transaction={t}
+                    label={t.tags.length === 0 ? "Add category" : "+"}
+                  />
+                </div>
+
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  {!isTransfer && amount > 0 && buckets.length > 0 && (
+                    <FundedByBucketSelect
+                      transactionId={t.transaction_id}
+                      buckets={buckets}
+                      selectedBucketId={t.fundedByBucket?.bucketId}
+                    />
+                  )}
+                  {!isTransfer && isCredit && (
+                    <SavingsReimbursementSelect
+                      transactionId={t.transaction_id}
+                      isReimbursement={t.isSavingsReimbursement}
+                    />
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </FeatureBox>
     </div>
   );
