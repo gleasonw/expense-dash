@@ -1,4 +1,4 @@
-import { YyyyMm } from "@/app/utils/dates";
+import { monthRangeUTC, YyyyMm } from "@/app/utils/dates";
 import {
   getFilterConditions,
   tagExcludesSubtree,
@@ -7,13 +7,14 @@ import {
 import { db } from "@/server/db";
 import {
   bucketMovements,
+  savingsReimbursements,
   tagAllocationsNew,
   tags_new,
   tagsLinkNew,
   transactions,
 } from "@/server/schema";
 import { getUserWithTokenThrows } from "@/server/session";
-import { and, asc, eq, exists, inArray, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, lt, notExists, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { cache } from "react";
 
@@ -318,6 +319,20 @@ export const getNetSpendingByMonth = cache(
                 )
               )
           ),
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(savingsReimbursements)
+              .where(
+                and(
+                  eq(
+                    savingsReimbursements.transactionId,
+                    transactions.transaction_id
+                  ),
+                  eq(savingsReimbursements.userId, user.user.id)
+                )
+              )
+          ),
           ...filterConditions
         )
       )
@@ -349,6 +364,20 @@ export const getNetSpendingByMonth = cache(
                   //Maybe reconsider, currently this means that as soon as a transaction
                   // gets an income or transfer tag, it's excluded
                   inArray(tags_new.tag, ["income", "transfer"])
+                )
+              )
+          ),
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(savingsReimbursements)
+              .where(
+                and(
+                  eq(
+                    savingsReimbursements.transactionId,
+                    transactions.transaction_id
+                  ),
+                  eq(savingsReimbursements.userId, user.user.id)
                 )
               )
           ),
@@ -384,15 +413,44 @@ export const getNetSpendingByMonth = cache(
       .groupBy(sql`DATE_TRUNC('month', ${transactions.date})`)
       .as("bf");
 
+    const reimbursementSubquery = db
+      .select({
+        month: sql<string>`DATE_TRUNC('month', ${transactions.date})`.as(
+          "month"
+        ),
+        savings_reimbursements:
+          sql<number>`SUM(ABS(CAST(${transactions.amount} AS NUMERIC)))`.as(
+            "savings_reimbursements"
+          ),
+      })
+      .from(savingsReimbursements)
+      .innerJoin(
+        transactions,
+        eq(savingsReimbursements.transactionId, transactions.transaction_id)
+      )
+      .where(
+        and(
+          eq(savingsReimbursements.userId, user.user.id),
+          eq(transactions.user_id, user.user.id),
+          sql`CAST(${transactions.amount} AS NUMERIC) < 0`,
+          ...filterConditions
+        )
+      )
+      .groupBy(sql`DATE_TRUNC('month', ${transactions.date})`)
+      .as("sr");
+
     return await db
       .select({
         // oddly, drizzle won't auto alias, so to avoid ambiguity we have to manually alias
         // https://github.com/drizzle-team/drizzle-orm/issues/2772
-        month: sql<string>`COALESCE(mi.month, ms.month, bf.month) as month`,
+        month:
+          sql<string>`COALESCE(mi.month, ms.month, bf.month, sr.month) as month`,
         total_income: sql<string>`COALESCE(mi.total_income, 0) as total_income`,
         total_spending: sql<string>`COALESCE(ms.total_spending, 0) as total_spending`,
         bucket_funded_spending:
           sql<string>`COALESCE(bf.bucket_funded_spending, 0) as bucket_funded_spending`,
+        savings_reimbursements:
+          sql<string>`COALESCE(sr.savings_reimbursements, 0) as savings_reimbursements`,
         net_amount: sql<string>`
     COALESCE(mi.total_income, 0)
     + COALESCE(ms.total_spending, 0) as net_amount
@@ -404,6 +462,63 @@ export const getNetSpendingByMonth = cache(
         bucketFundingSubquery,
         eq(sql`COALESCE(mi.month, ms.month)`, sql`bf.month`)
       )
-      .orderBy(asc(sql`COALESCE(mi.month, ms.month, bf.month)`));
+      .fullJoin(
+        reimbursementSubquery,
+        eq(sql`COALESCE(mi.month, ms.month, bf.month)`, sql`sr.month`)
+      )
+      .orderBy(asc(sql`COALESCE(mi.month, ms.month, bf.month, sr.month)`));
   }
 );
+
+export const getSavingsFundingStatus = cache(async (throughMonth: YyyyMm) => {
+  const user = await getUserWithTokenThrows();
+  const { end } = monthRangeUTC(throughMonth);
+  const endDate = end.toISOString().slice(0, 10);
+
+  const [fundedRows, reimbursementRows] = await Promise.all([
+    db
+      .select({
+        amount: sql<string>`COALESCE(SUM(ABS(CAST(${bucketMovements.amount} AS NUMERIC))), 0)`,
+      })
+      .from(bucketMovements)
+      .innerJoin(
+        transactions,
+        eq(bucketMovements.transactionId, transactions.transaction_id)
+      )
+      .where(
+        and(
+          eq(bucketMovements.userId, user.user.id),
+          eq(transactions.user_id, user.user.id),
+          sql`CAST(${bucketMovements.amount} AS NUMERIC) < 0`,
+          lt(transactions.date, endDate)
+        )
+      ),
+    db
+      .select({
+        amount: sql<string>`COALESCE(SUM(ABS(CAST(${transactions.amount} AS NUMERIC))), 0)`,
+      })
+      .from(savingsReimbursements)
+      .innerJoin(
+        transactions,
+        eq(savingsReimbursements.transactionId, transactions.transaction_id)
+      )
+      .where(
+        and(
+          eq(savingsReimbursements.userId, user.user.id),
+          eq(transactions.user_id, user.user.id),
+          sql`CAST(${transactions.amount} AS NUMERIC) < 0`,
+          lt(transactions.date, endDate)
+        )
+      ),
+  ]);
+
+  const bucketFundedAmount = Number(fundedRows[0]?.amount ?? 0);
+  const reimbursedAmount = Number(reimbursementRows[0]?.amount ?? 0);
+
+  return {
+    bucketFundedAmount,
+    reimbursedAmount,
+    fundingNeeded: Math.max(bucketFundedAmount - reimbursedAmount, 0),
+    excessReimbursement: Math.max(reimbursedAmount - bucketFundedAmount, 0),
+  };
+});

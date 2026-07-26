@@ -7,6 +7,7 @@ import {
   auto_tag_merchants_new,
   bucketMovements,
   buckets,
+  savingsReimbursements,
   tagAllocationsNew,
   tags_new,
   tagsLinkNew,
@@ -208,6 +209,52 @@ export async function setTransactionBucketFunding({
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/savings");
+}
+
+export async function setSavingsReimbursement({
+  transactionId,
+  isReimbursement,
+}: {
+  transactionId: string;
+  isReimbursement: boolean;
+}) {
+  const user = await getUserWithTokenThrows();
+  const transaction = await db.query.transactions.findFirst({
+    where: and(
+      eq(transactions.transaction_id, transactionId),
+      eq(transactions.user_id, user.user.id)
+    ),
+  });
+
+  if (!transaction) {
+    throw new Error("transaction not found");
+  }
+
+  const transactionAmount = Number(transaction.amount);
+  if (!Number.isFinite(transactionAmount) || transactionAmount >= 0) {
+    throw new Error("only incoming credits can be savings reimbursements");
+  }
+
+  if (isReimbursement) {
+    await db
+      .insert(savingsReimbursements)
+      .values({
+        transactionId,
+        userId: user.user.id,
+      })
+      .onConflictDoNothing();
+  } else {
+    await db
+      .delete(savingsReimbursements)
+      .where(
+        and(
+          eq(savingsReimbursements.transactionId, transactionId),
+          eq(savingsReimbursements.userId, user.user.id)
+        )
+      );
+  }
+
+  revalidatePath("/dashboard");
 }
 
 export async function setTagAllocation(formData: FormData) {

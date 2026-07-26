@@ -5,6 +5,7 @@ import {
   auto_tag_merchants_new,
   bucketMovements,
   buckets,
+  savingsReimbursements,
   tags_new,
   tagsLinkNew,
   transactions,
@@ -344,10 +345,29 @@ export const getTransactionsWithTags = cache(
       (row) => row.transactionId ?? ""
     );
 
+    const reimbursementRows =
+      transactionIds.length === 0
+        ? []
+        : await db
+            .select({ transactionId: savingsReimbursements.transactionId })
+            .from(savingsReimbursements)
+            .where(
+              and(
+                eq(savingsReimbursements.userId, user.user.id),
+                inArray(savingsReimbursements.transactionId, transactionIds)
+              )
+            );
+    const reimbursementTransactionIds = new Set(
+      reimbursementRows.map((row) => row.transactionId)
+    );
+
     return mergedTransactions.map((transaction) => ({
       ...transaction,
       autoTagMatchCount: autoTagMatchCounts[transaction.transaction_id] ?? 0,
       fundedByBucket: fundingByTransactionId[transaction.transaction_id],
+      isSavingsReimbursement: reimbursementTransactionIds.has(
+        transaction.transaction_id
+      ),
     }));
   }
 );

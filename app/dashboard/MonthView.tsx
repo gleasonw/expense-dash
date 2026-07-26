@@ -30,6 +30,7 @@ import { allUserTags } from "@/app/dashboard/tags_sdk";
 import { TransactionWithAutoTagMatchCount } from "@/app/dashboard/transactions_sdk";
 import { Sparkles } from "lucide-react";
 import { FundedByBucketSelect } from "@/app/dashboard/FundedByBucketSelect";
+import { SavingsReimbursementSelect } from "@/app/dashboard/SavingsReimbursementSelect";
 
 type BucketFundingOption = {
   id: number;
@@ -46,6 +47,7 @@ type FundedTransaction = TransactionWithTags &
       bucketColor: string | null;
       amount: string;
     };
+    isSavingsReimbursement: boolean;
   };
 
 function formatMoney(amount: number) {
@@ -64,6 +66,7 @@ export async function MonthView({
   allTags,
   buckets,
   netSpendForSelectedMonth,
+  savingsFundingStatus,
 }: {
   monthUTC: dateUtils.YyyyMm;
   filterByTag?: string;
@@ -71,11 +74,18 @@ export async function MonthView({
   tsMerged: FundedTransaction[];
   allTags: Tag[];
   buckets: BucketFundingOption[];
+  savingsFundingStatus: {
+    bucketFundedAmount: number;
+    reimbursedAmount: number;
+    fundingNeeded: number;
+    excessReimbursement: number;
+  };
   netSpendForSelectedMonth?: {
     month: string;
     total_income: string;
     total_spending: string;
     bucket_funded_spending: string;
+    savings_reimbursements: string;
     net_amount: string;
   };
   spendingLast5Months: SpendingRow[];
@@ -91,12 +101,19 @@ export async function MonthView({
     Number(netSpendForSelectedMonth?.total_spending ?? 0),
   );
   const netAmount = Number(netSpendForSelectedMonth?.net_amount ?? 0);
-  const bucketFundedAmount = Number(
+  const monthBucketFundedAmount = Number(
     netSpendForSelectedMonth?.bucket_funded_spending ?? 0,
   );
+  const bucketFundedAmount = savingsFundingStatus.bucketFundedAmount;
+  const savingsReimbursements = savingsFundingStatus.reimbursedAmount;
+  const savingsFundingNeeded = savingsFundingStatus.fundingNeeded;
+  const excessReimbursement = savingsFundingStatus.excessReimbursement;
   const cashflowGap = Math.max(-netAmount, 0);
-  const coveredByBuckets = Math.min(bucketFundedAmount, cashflowGap);
-  const uncoveredOverspend = Math.max(cashflowGap - bucketFundedAmount, 0);
+  const coveredByBuckets = Math.min(monthBucketFundedAmount, cashflowGap);
+  const uncoveredOverspend = Math.max(
+    cashflowGap - monthBucketFundedAmount,
+    0,
+  );
   const netStateClass =
     netAmount >= 0
       ? "bg-green-50 border border-green-200"
@@ -150,6 +167,38 @@ export async function MonthView({
               <span className="mt-1 text-xs text-gray-600">
                 {formatMoney(coveredByBuckets)} covered /{" "}
                 {formatMoney(uncoveredOverspend)} uncovered
+              </span>
+            )}
+          </div>
+
+          {/* Savings reimbursement card */}
+          <div
+            className={clsx(
+              "rounded-lg border p-4 shadow-sm flex flex-col",
+              savingsFundingNeeded > 0
+                ? "border-amber-200 bg-amber-50"
+                : "border-blue-200 bg-blue-50",
+            )}
+          >
+            <span className="text-sm font-medium text-gray-600 mb-1">
+              Send from savings
+            </span>
+            <span
+              className={clsx(
+                "text-2xl font-bold",
+                savingsFundingNeeded > 0 ? "text-amber-700" : "text-blue-700",
+              )}
+            >
+              {formatMoney(savingsFundingNeeded)}
+            </span>
+            <span className="mt-1 text-xs text-gray-600">
+              {formatMoney(bucketFundedAmount)} funded /{" "}
+              {formatMoney(savingsReimbursements)} transferred through this
+              month
+            </span>
+            {excessReimbursement > 0 && (
+              <span className="mt-1 text-xs text-blue-700">
+                {formatMoney(excessReimbursement)} more transferred than funded
               </span>
             )}
           </div>
@@ -208,6 +257,12 @@ export async function MonthView({
                   transactionId={t.transaction_id}
                   buckets={buckets}
                   selectedBucketId={t.fundedByBucket?.bucketId}
+                />
+              )}
+              {Number(t.amount) < 0 && (
+                <SavingsReimbursementSelect
+                  transactionId={t.transaction_id}
+                  isReimbursement={t.isSavingsReimbursement}
                 />
               )}
               <div className="ml-auto">

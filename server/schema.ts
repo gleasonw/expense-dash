@@ -245,6 +245,23 @@ export const bucketMovementsRelations = relations(
   })
 );
 
+/**
+ * Marks an incoming transfer to a main account as repayment for expenses that
+ * were funded by savings buckets. This is intentionally separate from bucket
+ * movements: the linked expenses have already reduced their bucket balances.
+ */
+export const savingsReimbursements = pgTable("savings_reimbursements", {
+  transactionId: text("transaction_id")
+    .primaryKey()
+    .references(() => transactions.transaction_id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => userTable.id),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+    .notNull()
+    .defaultNow(),
+});
+
 export const plaidAccount = pgTable("plaid_account", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id")
@@ -271,6 +288,9 @@ export type PostBucket = InferInsertModel<typeof buckets>;
 export type Bucket = InferSelectModel<typeof buckets>;
 export type PostMovement = InferInsertModel<typeof bucketMovements>;
 export type Movement = InferSelectModel<typeof bucketMovements>;
+export type SavingsReimbursement = InferSelectModel<
+  typeof savingsReimbursements
+>;
 export type Tag = InferSelectModel<typeof tags_new>;
 export type UpdateTag = InferInsertModel<typeof tags_new>;
 export type TagAllocation = InferSelectModel<typeof tagAllocationsNew>;

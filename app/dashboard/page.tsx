@@ -1,6 +1,7 @@
 import { getTransactionsWithTags } from "@/app/dashboard/transactions_sdk";
 import {
   getNetSpendingByMonth,
+  getSavingsFundingStatus,
   monthSpending,
 } from "@/app/dashboard/aggregates";
 import * as dateUtils from "@/app/utils/dates";
@@ -112,6 +113,7 @@ export default async function Dashboard({
     spendingLast5Months,
     testAllNetSpend,
     buckets,
+    savingsFundingStatus,
   ] =
     await Promise.all([
       getTransactionsWithTags({
@@ -127,6 +129,7 @@ export default async function Dashboard({
       }),
       getNetSpendingByMonth({ pastXMonths: 3 }),
       getBuckets(),
+      getSavingsFundingStatus(monthUTC),
     ]);
 
   console.log({ testAllNetSpend });
@@ -144,6 +147,7 @@ export default async function Dashboard({
         allTags={allTags}
         buckets={buckets.filter((bucket) => !bucket.isArchived)}
         netSpendForSelectedMonth={netSpendForSelectedMonth}
+        savingsFundingStatus={savingsFundingStatus}
         spendingLast5Months={spendingLast5Months ?? []}
         testAllNetSpend={testAllNetSpend ?? []}
       />
