@@ -13,8 +13,8 @@ export function StartMonthPicker() {
   defaultStart.setUTCMonth(defaultStart.getUTCMonth() - 12);
   const defaultStartMonth = dateUtils.normYyyyMm(
     `${defaultStart.getUTCFullYear()}-${String(
-      defaultStart.getUTCMonth() + 1
-    ).padStart(2, "0")}`
+      defaultStart.getUTCMonth() + 1,
+    ).padStart(2, "0")}`,
   );
 
   const startMonth = searchParams.get("startMonth") ?? defaultStartMonth;
@@ -26,7 +26,6 @@ export function StartMonthPicker() {
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium">Start Month</label>
       <Calendar
         mode="single"
         month={end}
@@ -35,7 +34,7 @@ export function StartMonthPicker() {
           const currentURL = new URL(window.location.href);
           currentURL.searchParams.set(
             "startMonth",
-            month.toISOString().slice(0, 7)
+            month.toISOString().slice(0, 7),
           );
           router.push(currentURL.toString());
         }}
@@ -63,8 +62,8 @@ export function EndMonthPicker() {
   const defaultEnd = new Date();
   const defaultEndMonth = dateUtils.normYyyyMm(
     `${defaultEnd.getUTCFullYear()}-${String(
-      defaultEnd.getUTCMonth() + 1
-    ).padStart(2, "0")}`
+      defaultEnd.getUTCMonth() + 1,
+    ).padStart(2, "0")}`,
   );
 
   const endMonth = searchParams.get("endMonth") ?? defaultEndMonth;
@@ -76,7 +75,6 @@ export function EndMonthPicker() {
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium">End Month</label>
       <Calendar
         mode="single"
         month={end}
@@ -85,7 +83,7 @@ export function EndMonthPicker() {
           const currentURL = new URL(window.location.href);
           currentURL.searchParams.set(
             "endMonth",
-            month.toISOString().slice(0, 7)
+            month.toISOString().slice(0, 7),
           );
           router.push(currentURL.toString());
         }}

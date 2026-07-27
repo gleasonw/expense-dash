@@ -13,7 +13,6 @@ import { tagAllAsFirstTag } from "@/app/dashboard/transactions_sdk";
 import { monthSpending, SpendingRow } from "@/app/dashboard/aggregates";
 import { IS_LOCAL_HOST } from "@/env";
 import * as dateUtils from "@/app/utils/dates";
-import { MonthPicker } from "@/app/dashboard/MonthPicker";
 import { TransactionDateEditor } from "@/app/dashboard/SpendingTable";
 import { CreateAllocationForm } from "@/app/dashboard/CreateAllocationForm";
 import { AddTagInput, RemoveTagButton } from "@/app/dashboard/RemoveTagButton";
@@ -117,103 +116,85 @@ export async function MonthView({
   const savingsReimbursements = savingsFundingStatus.reimbursedAmount;
   const savingsFundingNeeded = savingsFundingStatus.fundingNeeded;
   const excessReimbursement = savingsFundingStatus.excessReimbursement;
-  const netStateClass =
-    netAmount >= 0
-      ? "bg-green-50 border border-green-200"
-      : "bg-red-50 border border-red-200";
-  const netTextClass =
-    netAmount >= 0 ? "text-green-700" : "text-red-700";
+  const netTextClass = netAmount >= 0 ? "text-green-700" : "text-red-700";
 
   return (
-    <div className="px-2 flex flex-col justify-center w-full items-center max-w-[1000px] gap-5">
-      <div className="flex flex-col lg:flex-row gap-4 w-full items-stretch">
-        <FeatureBox className="flex items-center justify-center">
-          <MonthPicker monthUTC={monthUTC} />
-        </FeatureBox>
+    <div className="px-2 flex flex-col lg:flex-row justify-center w-full items-center max-w-[1000px] lg:max-w-[2000px] lg:items-start lg:justify-start gap-5">
+      <div className="flex w-full flex-col gap-5">
+        <div className="flex flex-col lg:flex-row gap-4 w-full items-stretch">
+          <div className="flex flex-wrap gap-4 flex-1">
+            <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col gap-2">
+              <span className="text-2xl font-bold text-green-900 text-right tabular-nums">
+                <span>+</span>
+                <span className="">{formatMoney(incomeAmount)}</span>
+              </span>
+              <span className="text-2xl font-bold text-gray-900 text-right tabular-nums">
+                <span>-</span>
+                <span className="">{formatMoney(spendingAmount)}</span>
+              </span>
+              <span className="w-full h-1 bg-gray-200"></span>
+              <span
+                className={`text-2xl font-bold ${netTextClass} text-right tabular-nums`}
+              >
+                {formatMoney(netAmount)}
+              </span>
+            </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
-          {/* Income Card */}
-          <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
-            <span className="text-sm font-medium text-gray-500 mb-1">
-              Income
-            </span>
-            <span className="text-2xl font-bold text-gray-900">
-              {formatMoney(incomeAmount)}
-            </span>
-          </div>
-
-          {/* Spending Card */}
-          <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
-            <span className="text-sm font-medium text-gray-500 mb-1">
-              Spending
-            </span>
-            <span className="text-2xl font-bold text-gray-900">
-              {formatMoney(spendingAmount)}
-            </span>
-          </div>
-
-          {/* Net Card */}
-          <div
-            className={`rounded-lg shadow-sm p-4 flex flex-col ${netStateClass}`}
-          >
-            <span className="text-sm font-medium text-gray-600 mb-1">Net</span>
-            <span className={`text-2xl font-bold ${netTextClass}`}>
-              {formatMoney(netAmount)}
-            </span>
-            <span className="mt-1 text-xs text-gray-600">
-              Income minus spending
-            </span>
-          </div>
-
-          {/* Savings reimbursement card */}
-          <div
-            className={clsx(
-              "rounded-lg border p-4 shadow-sm flex flex-col",
-              savingsFundingNeeded > 0
-                ? "border-amber-200 bg-amber-50"
-                : "border-blue-200 bg-blue-50",
-            )}
-          >
-            <span className="text-sm font-medium text-gray-600 mb-1">
-              Send from savings
-            </span>
-            <span
+            <div
               className={clsx(
-                "text-2xl font-bold",
-                savingsFundingNeeded > 0 ? "text-amber-700" : "text-blue-700",
+                "rounded-lg border p-4 shadow-sm flex flex-col",
+                savingsFundingNeeded > 0
+                  ? "border-amber-200 bg-amber-50"
+                  : "border-blue-200 bg-blue-50",
               )}
             >
-              {formatMoney(savingsFundingNeeded)}
-            </span>
-            <span className="mt-1 text-xs text-gray-600">
-              {formatMoney(bucketFundedAmount)} funded /{" "}
-              {formatMoney(savingsReimbursements)} transferred through this
-              month
-            </span>
-            {excessReimbursement > 0 && (
-              <span className="mt-1 text-xs text-blue-700">
-                {formatMoney(excessReimbursement)} more transferred than funded
+              <span className="text-sm font-medium text-gray-600 mb-1">
+                Send from savings
               </span>
-            )}
+              <span
+                className={clsx(
+                  "text-2xl font-bold",
+                  savingsFundingNeeded > 0 ? "text-amber-700" : "text-blue-700",
+                )}
+              >
+                {formatMoney(savingsFundingNeeded)}
+              </span>
+              <span className="mt-1 text-xs text-gray-600">
+                {formatMoney(bucketFundedAmount)} funded /{" "}
+                {formatMoney(savingsReimbursements)} transferred through this
+                month
+              </span>
+              {excessReimbursement > 0 && (
+                <span className="mt-1 text-xs text-blue-700">
+                  {formatMoney(excessReimbursement)} more transferred than
+                  funded
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-      <FeatureBox
-        className={clsx("w-full col-span-2 ", {
-          hidden: tsMerged.filter((t) => t.tags.length === 0).length === 0,
-        })}
-      >
-        <SpendingCategorizer
-          transactionsWithoutTag={tsMerged.filter((t) => t.tags.length === 0)}
-        />
-        {IS_LOCAL_HOST && (
-          <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
-        )}
-      </FeatureBox>
+        <div className="flex flex-col gap-5 w-full">
+          <FeatureBox
+            className={clsx("w-full col-span-2 ", {
+              hidden: tsMerged.filter((t) => t.tags.length === 0).length === 0,
+            })}
+          >
+            <SpendingCategorizer
+              transactionsWithoutTag={tsMerged.filter(
+                (t) => t.tags.length === 0,
+              )}
+            />
+            {IS_LOCAL_HOST && (
+              <button onClick={tagAllAsFirstTag}>tag all as first tag</button>
+            )}
+          </FeatureBox>
 
-      <FeatureBox className="col-start-2 row-start-2 row-span-2 w-full">
-        <SpendingTargets monthUTC={monthUTC} />
-      </FeatureBox>
+          <FeatureBox className="col-start-2 row-start-2 row-span-2 w-full">
+            <SpendingTargets monthUTC={monthUTC} />
+          </FeatureBox>
+        </div>
+      </div>
+
       <FeatureBox className="flex flex-col w-full">
         <TransactionFilters selectedTag={filterByTag} amountSort={amountSort} />
         {tsMerged.map((t) => {
@@ -239,11 +220,14 @@ export async function MonthView({
                     compact
                   />
                   <span
-                    className={clsx("min-w-[88px] text-right text-sm font-semibold", {
-                      "text-gray-400": isTransfer,
-                      "text-emerald-700": isCredit && !isTransfer,
-                      "text-gray-900": !isCredit && !isTransfer,
-                    })}
+                    className={clsx(
+                      "min-w-[88px] text-right text-sm font-semibold",
+                      {
+                        "text-gray-400": isTransfer,
+                        "text-emerald-700": isCredit && !isTransfer,
+                        "text-gray-900": !isCredit && !isTransfer,
+                      },
+                    )}
                   >
                     {formatTransactionAmount(amount)}
                   </span>

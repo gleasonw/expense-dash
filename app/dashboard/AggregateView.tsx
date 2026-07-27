@@ -4,10 +4,6 @@ import { SpendingChart } from "@/app/dashboard/SpendingChart";
 import { NetSpendChart } from "@/app/dashboard/NetSpendingChart";
 import { SubtagDrilldownChart } from "@/app/dashboard/SubtagDrilldownChart";
 import { FilterByTagDropdown } from "@/app/dashboard/FilterByTagDropdown";
-import {
-  StartMonthPicker,
-  EndMonthPicker,
-} from "@/app/dashboard/MonthRangePicker";
 import * as style from "@/app/dashboard/dashboard.module.css";
 import { SpendingRow } from "@/app/dashboard/aggregates";
 import { Tag } from "@/server/schema";
@@ -32,14 +28,6 @@ export function AggregateView({
 }) {
   return (
     <div className="px-2 flex flex-col gap-5 max-h-full overflow-hidden w-full">
-      {/* Controls Row */}
-      <div className="flex gap-4 w-full flex-wrap items-end bg-white p-4 rounded shadow-md">
-        <div className="flex gap-4">
-          <StartMonthPicker />
-          <EndMonthPicker />
-        </div>
-      </div>
-
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <FeatureBox>

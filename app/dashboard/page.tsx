@@ -46,16 +46,16 @@ export default async function Dashboard({
       ? dateUtils.normYyyyMm(startMonthParam)
       : dateUtils.normYyyyMm(
           `${defaultStartDate.getUTCFullYear()}-${String(
-            defaultStartDate.getUTCMonth() + 1
-          ).padStart(2, "0")}`
+            defaultStartDate.getUTCMonth() + 1,
+          ).padStart(2, "0")}`,
         );
 
     const endMonth = endMonthParam
       ? dateUtils.normYyyyMm(endMonthParam)
       : dateUtils.normYyyyMm(
           `${currentDate.getUTCFullYear()}-${String(
-            currentDate.getUTCMonth() + 1
-          ).padStart(2, "0")}`
+            currentDate.getUTCMonth() + 1,
+          ).padStart(2, "0")}`,
         );
 
     // Calculate number of months between start and end
@@ -114,23 +114,22 @@ export default async function Dashboard({
     testAllNetSpend,
     buckets,
     savingsFundingStatus,
-  ] =
-    await Promise.all([
-      getTransactionsWithTags({
-        tag: filterByTag,
-        monthUTC,
-        amountSort: validatedAmountSort,
-      }),
-      getNetSpendingByMonth({ monthUTC }),
-      monthSpending({
-        forPastXMonths: 3,
-        excludeTags: ["income", "transfer"],
-        atDepth: 1,
-      }),
-      getNetSpendingByMonth({ pastXMonths: 3 }),
-      getBuckets(),
-      getSavingsFundingStatus(monthUTC),
-    ]);
+  ] = await Promise.all([
+    getTransactionsWithTags({
+      tag: filterByTag,
+      monthUTC,
+      amountSort: validatedAmountSort,
+    }),
+    getNetSpendingByMonth({ monthUTC }),
+    monthSpending({
+      forPastXMonths: 3,
+      excludeTags: ["income", "transfer"],
+      atDepth: 1,
+    }),
+    getNetSpendingByMonth({ pastXMonths: 3 }),
+    getBuckets(),
+    getSavingsFundingStatus(monthUTC),
+  ]);
 
   console.log({ testAllNetSpend });
 
