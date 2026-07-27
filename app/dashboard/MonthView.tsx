@@ -129,7 +129,7 @@ export async function MonthView({
       <div className="flex w-full flex-col gap-5">
         <div className="flex flex-col lg:flex-row gap-4 w-full items-stretch">
           <div className="flex flex-wrap gap-4 flex-1">
-            <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col gap-2">
+            <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col gap-2 w-full">
               <span className="text-2xl font-bold text-green-900 text-right tabular-nums">
                 <span>+</span>
                 <span className="">{formatMoney(incomeAmount)}</span>
