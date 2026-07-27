@@ -28,6 +28,14 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
       return acc;
     }, {} as Record<string, { data: Array<{ name: string; y: number }>; color: string }>);
 
+    const months = Array.from(
+      new Set(
+        Object.values(groupedData).flatMap(({ data }) =>
+          data.map(({ name }) => name)
+        )
+      )
+    ).sort();
+
     return {
       chart: {
         styledMode: true,
@@ -39,7 +47,7 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
         text: "Monthly Spending by Category",
       },
       xAxis: {
-        type: "category",
+        categories: months,
         title: { text: "Month" },
         labels: {
           rotation: -45,
@@ -70,12 +78,18 @@ export function SpendingChart({ discretionaryByMonth }: SpendingChartProps) {
           },
         },
       },
-      series: Object.entries(groupedData).map(([tag, { data, color }]) => ({
-        name: tag,
-        data,
-        color: "",
-        className: `fill-${color}-400`,
-      })),
+      series: Object.entries(groupedData).map(([tag, { data, color }]) => {
+        const spendingByMonth = new Map(
+          data.map(({ name, y }) => [name, y])
+        );
+
+        return {
+          name: tag,
+          data: months.map((month) => spendingByMonth.get(month) ?? null),
+          color: "",
+          className: `fill-${color}-400`,
+        };
+      }),
     };
   }, [discretionaryByMonth]);
 

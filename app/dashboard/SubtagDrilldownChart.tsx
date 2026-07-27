@@ -38,6 +38,14 @@ export function SubtagDrilldownChart({
       return acc;
     }, {} as Record<string, { data: Array<{ name: string; y: number }>; color: string }>);
 
+    const months = Array.from(
+      new Set(
+        Object.values(groupedData).flatMap(({ data }) =>
+          data.map(({ name }) => name)
+        )
+      )
+    ).sort();
+
     return {
       chart: {
         styledMode: true,
@@ -49,7 +57,7 @@ export function SubtagDrilldownChart({
         text: `${parentTag} Breakdown by Subtag`,
       },
       xAxis: {
-        type: "category",
+        categories: months,
         title: { text: "Month" },
         labels: {
           rotation: -45,
@@ -80,12 +88,18 @@ export function SubtagDrilldownChart({
           },
         },
       },
-      series: Object.entries(groupedData).map(([tag, { data, color }]) => ({
-        name: lowestTagForString(tag),
-        data,
-        color: "",
-        className: `fill-${color}-400`,
-      })),
+      series: Object.entries(groupedData).map(([tag, { data, color }]) => {
+        const spendingByMonth = new Map(
+          data.map(({ name, y }) => [name, y])
+        );
+
+        return {
+          name: lowestTagForString(tag),
+          data: months.map((month) => spendingByMonth.get(month) ?? null),
+          color: "",
+          className: `fill-${color}-400`,
+        };
+      }),
     };
   }, [subtagData, parentTag]);
 
