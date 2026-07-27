@@ -27,9 +27,15 @@ import { getFilterConditions } from "@/app/utils/transactions_querys";
 import { Tag, TransactionWithTags } from "@/server/schema";
 import { allUserTags } from "@/app/dashboard/tags_sdk";
 import { TransactionWithAutoTagMatchCount } from "@/app/dashboard/transactions_sdk";
-import { Sparkles } from "lucide-react";
+import { PiggyBank, Sparkles } from "lucide-react";
 import { FundedByBucketSelect } from "@/app/dashboard/FundedByBucketSelect";
 import { SavingsReimbursementSelect } from "@/app/dashboard/SavingsReimbursementSelect";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 type BucketFundingOption = {
   id: number;
@@ -207,7 +213,7 @@ export async function MonthView({
           return (
             <div
               key={t.transaction_id}
-              className="flex flex-col gap-2 border-b border-gray-100 px-3 py-2.5 transition-colors hover:bg-gray-50"
+              className="flex flex-col border-b border-gray-100 px-3 py-2.5 transition-colors hover:bg-gray-50"
             >
               <div className="flex min-w-0 items-center justify-between gap-4">
                 <span className="min-w-0 truncate text-sm font-medium text-gray-900">
@@ -260,13 +266,26 @@ export async function MonthView({
                   />
                 </div>
 
-                <div className="ml-auto flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {!isTransfer && amount > 0 && buckets.length > 0 && (
-                    <FundedByBucketSelect
-                      transactionId={t.transaction_id}
-                      buckets={buckets}
-                      selectedBucketId={t.fundedByBucket?.bucketId}
-                    />
+                    <Popover>
+                      <PopoverTrigger>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-gray-300"
+                        >
+                          <PiggyBank />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="bg-white">
+                        <FundedByBucketSelect
+                          transactionId={t.transaction_id}
+                          buckets={buckets}
+                          selectedBucketId={t.fundedByBucket?.bucketId}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   )}
                   {!isTransfer && isCredit && (
                     <SavingsReimbursementSelect
