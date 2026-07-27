@@ -10,6 +10,7 @@ import { ViewToggle } from "@/app/dashboard/ViewToggle";
 import { MonthView } from "@/app/dashboard/MonthView";
 import { AggregateView } from "@/app/dashboard/AggregateView";
 import { getBuckets } from "@/app/dashboard/buckets_sdk";
+import { NavMenu } from "@/app/NavMenu";
 
 // TODO
 // break down transactions table into accounts (tabs probably make the most sense here)
@@ -137,7 +138,7 @@ export default async function Dashboard({
 
   return (
     <div className="flex flex-col gap-4 p-4 items-center">
-      <ViewToggle defaultView="month" />
+      <ViewToggle defaultView="month" extra={<NavMenu />} />
       <MonthView
         monthUTC={monthUTC}
         filterByTag={filterByTag}

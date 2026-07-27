@@ -6,6 +6,7 @@ import {
 } from "@/app/dashboard/actions";
 import { AutoTagAutocompleteInput } from "@/app/dashboard/AutoTagAutocompleteInput";
 import { TagColorPicker } from "@/app/dashboard/TagColorPicker";
+import { NavMenu } from "@/app/NavMenu";
 import { db } from "@/server/db";
 import {
   auto_tag_merchants_new,
@@ -37,10 +38,10 @@ function escapeLike(value: string) {
 export default async function TagsPage({ searchParams }: TagsPageProps) {
   const user = await getUserWithTokenThrows();
   const transactionQuery = normalizeSearchParam(
-    (await searchParams)?.transaction
+    (await searchParams)?.transaction,
   ).trim();
   const merchantQuery = normalizeSearchParam(
-    (await searchParams)?.merchant
+    (await searchParams)?.merchant,
   ).trim();
   const transactionLike =
     transactionQuery.length >= MIN_QUERY_LENGTH
@@ -80,8 +81,8 @@ export default async function TagsPage({ searchParams }: TagsPageProps) {
             ne(transactions.name, ""),
             ...(transactionLike
               ? [sql`${transactions.name} ILIKE ${transactionLike} ESCAPE '\\'`]
-              : [])
-          )
+              : []),
+          ),
         )
         .groupBy(transactions.name)
         .orderBy(asc(transactions.name))
@@ -98,8 +99,8 @@ export default async function TagsPage({ searchParams }: TagsPageProps) {
               ? [
                   sql`${transactions.merchant_name} ILIKE ${merchantLike} ESCAPE '\\'`,
                 ]
-              : [])
-          )
+              : []),
+          ),
         )
         .groupBy(transactions.merchant_name)
         .orderBy(asc(transactions.merchant_name))
@@ -107,13 +108,14 @@ export default async function TagsPage({ searchParams }: TagsPageProps) {
     ]);
 
   const transactionNameSuggestions = transactionNameRows.map(
-    ({ name }) => name
+    ({ name }) => name,
   );
   const merchantNameSuggestions = merchantNameRows
     .map(({ merchantName }) => merchantName)
     .filter((merchantName): merchantName is string => Boolean(merchantName));
   return (
     <div className="flex flex-col gap-5 p-5 max-w-5xl mx-auto">
+      <NavMenu />
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold">Tags</h2>
         <TagMaker />

@@ -10,9 +10,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 interface ViewToggleProps {
   defaultView?: "month" | "aggregate";
+  extra?: React.ReactNode;
 }
 
-export function ViewToggle({ defaultView = "month" }: ViewToggleProps) {
+export function ViewToggle({ defaultView = "month", extra }: ViewToggleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentView = (searchParams.get("view") ?? defaultView) as
@@ -35,6 +36,7 @@ export function ViewToggle({ defaultView = "month" }: ViewToggleProps) {
 
   return (
     <div className="flex w-full items-start gap-3">
+      {extra}
       <div className="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500">
         <button
           onClick={() => handleViewChange("month")}

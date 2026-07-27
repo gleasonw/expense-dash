@@ -15,6 +15,7 @@ import { BucketForm } from "./BucketForm";
 import { BucketCard } from "./BucketCard";
 import { MonthPicker } from "@/app/dashboard/MonthPicker";
 import * as dateUtils from "@/app/utils/dates";
+import { NavMenu } from "@/app/NavMenu";
 
 type SavingsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -31,7 +32,7 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
   await getUserWithTokenThrows();
 
   const monthParam = normalizeSearchParam(
-    (await searchParams)?.monthUTC
+    (await searchParams)?.monthUTC,
   ).trim();
   const monthUTC = dateUtils.normYyyyMm(monthParam || undefined);
   const selectedMonth = monthUTC.slice(0, 7);
@@ -48,16 +49,16 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
   // Calculate budget overview data
   const totalSavingsBudget = savingsTransactions.reduce(
     (sum, t) => sum + Math.abs(parseFloat(t.transactionAmount)),
-    0
+    0,
   );
 
   const totalAllocated = savingsTransactions.reduce(
     (sum, t) => sum + parseFloat(t.allocatedAmount),
-    0
+    0,
   );
 
   const orphanedCount = movementsWithOrphaned.filter(
-    (m) => m.isOrphaned
+    (m) => m.isOrphaned,
   ).length;
 
   const budgetData = {
@@ -71,10 +72,10 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
   const activeBuckets = buckets.filter((b) => !b.isArchived);
 
   const hasAllocationBuckets = activeBuckets.some(
-    (b) => parseFloat(b.autoAllocationPercent ?? "0") > 0
+    (b) => parseFloat(b.autoAllocationPercent ?? "0") > 0,
   );
   const hasUnallocatedTransactions = savingsTransactions.some(
-    (t) => parseFloat(t.unallocatedAmount) > 0
+    (t) => parseFloat(t.unallocatedAmount) > 0,
   );
   const sortedBuckets = [...activeBuckets].sort((a, b) => {
     const aHasTarget =
@@ -99,14 +100,18 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
     isOrphaned: boolean;
   };
 
-  const bucketMovementsMap = movementsWithOrphaned.reduce((acc, movement) => {
-    if (!acc[movement.bucketId]) acc[movement.bucketId] = [];
-    acc[movement.bucketId]!.push(movement);
-    return acc;
-  }, {} as Record<number, MovementWithOrphaned[]>);
+  const bucketMovementsMap = movementsWithOrphaned.reduce(
+    (acc, movement) => {
+      if (!acc[movement.bucketId]) acc[movement.bucketId] = [];
+      acc[movement.bucketId]!.push(movement);
+      return acc;
+    },
+    {} as Record<number, MovementWithOrphaned[]>,
+  );
 
   return (
     <div className="p-6 max-w-7xl w-full mx-auto">
+      <NavMenu />
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -161,7 +166,9 @@ export default async function Savings({ searchParams }: SavingsPageProps) {
                   historicalAverageMonthlySavings={
                     historicalStats.averageMonthlySavings
                   }
-                  historicalMonthsWithSavings={historicalStats.monthsWithSavings}
+                  historicalMonthsWithSavings={
+                    historicalStats.monthsWithSavings
+                  }
                 />
               ))}
             </div>
