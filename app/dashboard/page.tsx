@@ -145,7 +145,17 @@ export default async function Dashboard({
         amountSort={validatedAmountSort}
         tsMerged={tsMerged}
         allTags={allTags}
-        buckets={buckets.filter((bucket) => !bucket.isArchived)}
+        buckets={buckets
+          .filter((bucket) => !bucket.isArchived)
+          .map((bucket) => ({
+            id: bucket.id,
+            name: bucket.name,
+            color: bucket.color,
+            currentBalance: bucket.movements.reduce(
+              (sum, movement) => sum + Number(movement.amount),
+              0,
+            ),
+          }))}
         netSpendForSelectedMonth={netSpendForSelectedMonth}
         savingsFundingStatus={savingsFundingStatus}
         spendingLast5Months={spendingLast5Months ?? []}

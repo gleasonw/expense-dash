@@ -453,6 +453,7 @@ export const getNetSpendingByMonth = cache(
           sql<string>`COALESCE(sr.savings_reimbursements, 0) as savings_reimbursements`,
         net_amount: sql<string>`
     COALESCE(mi.total_income, 0)
+    + COALESCE(sr.savings_reimbursements, 0)
     + COALESCE(ms.total_spending, 0) as net_amount
   `,
       })

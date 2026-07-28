@@ -14,7 +14,16 @@ type BucketOption = {
   id: number;
   name: string;
   color: string | null;
+  currentBalance: number;
 };
+
+function formatMoney(amount: number) {
+  return amount.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  });
+}
 
 export function FundedByBucketSelect({
   transactionId,
@@ -48,8 +57,12 @@ export function FundedByBucketSelect({
         <SelectContent>
           <SelectItem value="monthly-budget">Monthly budget</SelectItem>
           {buckets.map((bucket) => (
-            <SelectItem key={bucket.id} value={String(bucket.id)}>
-              {bucket.name}
+            <SelectItem
+              key={bucket.id}
+              value={String(bucket.id)}
+              textValue={`${bucket.name}, ${formatMoney(bucket.currentBalance)} available`}
+            >
+              {bucket.name} · {formatMoney(bucket.currentBalance)}
             </SelectItem>
           ))}
         </SelectContent>

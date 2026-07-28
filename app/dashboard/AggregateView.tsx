@@ -20,6 +20,7 @@ export function AggregateView({
     month: string;
     total_income: string;
     total_spending: string;
+    savings_reimbursements: string;
     net_amount: string;
   }>;
   allTags: Tag[];
@@ -65,8 +66,8 @@ export function AggregateView({
               rows={netSpendingData}
               title={
                 selectedTag
-                  ? "Net Spending Over Time (All Tags)"
-                  : "Net Spending Over Time"
+                  ? "Monthly Balance Over Time (All Tags)"
+                  : "Monthly Balance Over Time"
               }
             />
           </div>

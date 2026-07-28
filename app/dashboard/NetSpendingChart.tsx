@@ -9,6 +9,7 @@ export type NetRow = {
   month: string; // 'YYYY-MM-01 00:00:00+00'
   total_income: string;
   total_spending: string;
+  savings_reimbursements: string;
   net_amount: string;
 };
 
@@ -42,12 +43,14 @@ export function NetSpendChart({ rows, title }: NetSpendChartProps) {
       const y = parseFloat(r.net_amount);
       const income = parseFloat(r.total_income);
       const spend = parseFloat(r.total_spending);
+      const fromSavings = parseFloat(r.savings_reimbursements);
       return {
         name: parseMonthLabel(r.month),
         y,
         custom: {
           income,
           spend,
+          fromSavings,
         },
         className: y < 0 ? "net-neg" : "net-pos",
       };
@@ -61,7 +64,7 @@ export function NetSpendChart({ rows, title }: NetSpendChartProps) {
         height: null,
       },
       title: {
-        text: title ?? "Net Spend by Month",
+        text: title ?? "Monthly Balance by Month",
       },
       xAxis: {
         categories,
@@ -76,7 +79,7 @@ export function NetSpendChart({ rows, title }: NetSpendChartProps) {
         },
       },
       yAxis: {
-        title: { text: "Net Amount" },
+        title: { text: "Monthly Balance" },
         plotLines: [
           {
             value: 0,
@@ -95,12 +98,14 @@ export function NetSpendChart({ rows, title }: NetSpendChartProps) {
           const y = Number(p.y || 0);
           const income = Number(p.custom?.income || 0);
           const spend = Number(p.custom?.spend || 0);
+          const fromSavings = Number(p.custom?.fromSavings || 0);
           return `
 						<div>
 							<div><b>${cat}</b></div>
-							<div>Net: <b>${toCurrency(y)}</b></div>
+							<div>Monthly balance: <b>${toCurrency(y)}</b></div>
 							<div>Income: ${toCurrency(income)}</div>
-							<div>Spending: ${toCurrency(spend)}</div>
+							<div>From savings: ${toCurrency(fromSavings)}</div>
+							<div>Spending: ${toCurrency(Math.abs(spend))}</div>
 						</div>
 					`;
         },
@@ -128,7 +133,7 @@ export function NetSpendChart({ rows, title }: NetSpendChartProps) {
       },
       series: [
         {
-          name: "Net",
+          name: "Monthly balance",
           type: "column",
           data: points,
         },

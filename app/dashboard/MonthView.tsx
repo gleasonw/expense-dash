@@ -41,6 +41,7 @@ type BucketFundingOption = {
   id: number;
   name: string;
   color: string | null;
+  currentBalance: number;
 };
 
 type FundedTransaction = TransactionWithTags &
@@ -117,11 +118,11 @@ export async function MonthView({
   const spendingAmount = Math.abs(
     Number(netSpendForSelectedMonth?.total_spending ?? 0),
   );
+  const fromSavingsAmount = Number(
+    netSpendForSelectedMonth?.savings_reimbursements ?? 0,
+  );
   const netAmount = Number(netSpendForSelectedMonth?.net_amount ?? 0);
-  const bucketFundedAmount = savingsFundingStatus.bucketFundedAmount;
-  const savingsReimbursements = savingsFundingStatus.reimbursedAmount;
   const savingsFundingNeeded = savingsFundingStatus.fundingNeeded;
-  const excessReimbursement = savingsFundingStatus.excessReimbursement;
   const netTextClass = netAmount >= 0 ? "text-green-700" : "text-red-700";
 
   return (
@@ -129,16 +130,27 @@ export async function MonthView({
       <div className="flex w-full flex-col gap-5">
         <div className="flex flex-col lg:flex-row gap-4 w-full items-stretch">
           <div className="flex flex-wrap gap-4 flex-1">
-            <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col gap-2 w-full">
+            <div className="bg-white rounded-lg shadow-sm p-4 grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-2 w-full">
+              <span className="text-sm font-medium text-gray-500">Income</span>
               <span className="text-2xl font-bold text-green-900 text-right tabular-nums">
-                <span>+</span>
-                <span className="">{formatMoney(incomeAmount)}</span>
+                +{formatMoney(incomeAmount)}
+              </span>
+              <span className="text-sm font-medium text-gray-500">
+                From savings
+              </span>
+              <span className="text-2xl font-bold text-blue-800 text-right tabular-nums">
+                +{formatMoney(fromSavingsAmount)}
+              </span>
+              <span className="text-sm font-medium text-gray-500">
+                Spending
               </span>
               <span className="text-2xl font-bold text-gray-900 text-right tabular-nums">
-                <span>-</span>
-                <span className="">{formatMoney(spendingAmount)}</span>
+                −{formatMoney(spendingAmount)}
               </span>
-              <span className="w-full h-1 bg-gray-200"></span>
+              <span className="col-span-2 w-full h-1 bg-gray-200"></span>
+              <span className="text-sm font-semibold text-gray-700">
+                Monthly balance
+              </span>
               <span
                 className={`text-2xl font-bold ${netTextClass} text-right tabular-nums`}
               >
@@ -155,7 +167,7 @@ export async function MonthView({
               )}
             >
               <span className="text-sm font-medium text-gray-600 mb-1">
-                Send from savings
+                Outstanding savings transfer
               </span>
               <span
                 className={clsx(
@@ -165,17 +177,6 @@ export async function MonthView({
               >
                 {formatMoney(savingsFundingNeeded)}
               </span>
-              <span className="mt-1 text-xs text-gray-600">
-                {formatMoney(bucketFundedAmount)} funded /{" "}
-                {formatMoney(savingsReimbursements)} transferred through this
-                month
-              </span>
-              {excessReimbursement > 0 && (
-                <span className="mt-1 text-xs text-blue-700">
-                  {formatMoney(excessReimbursement)} more transferred than
-                  funded
-                </span>
-              )}
             </div>
           </div>
         </div>
